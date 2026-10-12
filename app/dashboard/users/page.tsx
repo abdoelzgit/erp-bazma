@@ -5,17 +5,22 @@ import { getUsersAction } from "@/app/actions/user";
 import { Role } from "@/lib/roles";
 import { UserTable } from "@/components/users/user-table";
 
-function UserTableSkeleton() {
+function UsersPageSkeleton() {
   return (
-    <tr>
-      <td colSpan={5} className="p-4 text-center text-muted-foreground">
+    <div className="flex flex-1 flex-col gap-6 p-6">
+      <div className="space-y-2">
+        <div className="h-8 w-48 rounded bg-muted animate-pulse" />
+        <div className="h-4 w-72 rounded bg-muted animate-pulse" />
+      </div>
+
+      <div className="rounded-lg border p-8 text-center text-muted-foreground text-sm">
         Memuat data pengguna...
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }
 
-async function UsersContent() {
+async function UsersManagement() {
   const user = await getCurrentUser();
 
   if (!user || user.role !== Role.ADMIN) {
@@ -23,40 +28,6 @@ async function UsersContent() {
   }
 
   const result = await getUsersAction();
-
-  if (result.error || !result.users) {
-    return (
-      <tr>
-        <td colSpan={5} className="p-4 text-center text-destructive">
-          Gagal memuat data pengguna: {result.error}
-        </td>
-      </tr>
-    );
-  }
-
-  return (
-    <>
-      {result.users.map((u) => (
-        <UserTable
-          key={u.id}
-          id={u.id}
-          name={u.name}
-          email={u.email}
-          role={u.role as Role}
-          createdAt={u.createdAt}
-          currentUserId={user.id}
-        />
-      ))}
-    </>
-  );
-}
-
-export default async function UsersPage() {
-  const user = await getCurrentUser();
-
-  if (!user || user.role !== Role.ADMIN) {
-    redirect("/dashboard");
-  }
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -79,12 +50,36 @@ export default async function UsersPage() {
             </tr>
           </thead>
           <tbody>
-            <Suspense fallback={<UserTableSkeleton />}>
-              <UsersContent />
-            </Suspense>
+            {result.error || !result.users ? (
+              <tr>
+                <td colSpan={5} className="p-4 text-center text-destructive">
+                  Gagal memuat data pengguna: {result.error}
+                </td>
+              </tr>
+            ) : (
+              result.users.map((u) => (
+                <UserTable
+                  key={u.id}
+                  id={u.id}
+                  name={u.name}
+                  email={u.email}
+                  role={u.role as Role}
+                  createdAt={u.createdAt}
+                  currentUserId={user.id}
+                />
+              ))
+            )}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <Suspense fallback={<UsersPageSkeleton />}>
+      <UsersManagement />
+    </Suspense>
   );
 }

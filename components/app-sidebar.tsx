@@ -16,9 +16,8 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { RowsIcon, SignOutIcon } from "@phosphor-icons/react"
+import { RowsIcon, SignOutIcon, UsersIcon, FileTextIcon } from "@phosphor-icons/react"
 import { logoutAction } from "@/app/actions/auth"
-import { UsersIcon } from "@phosphor-icons/react"
 import { Role } from "@/lib/roles"
 
 type NavItem = {
@@ -40,19 +39,16 @@ type NavMain = {
 const data: { navMain: NavMain[] } = {
   navMain: [
     {
-      title: "Getting Started",
-      url: "#",
-      items: [
-        {
-          title: "Installation",
-          url: "#",
-        },
-        {
-          title: "Project Structure",
-          url: "#",
-        },
-      ],
+      title: "Permohonan Dana (PPD)",
+      url: "/dashboard/ppd",
+      icon: <FileTextIcon className="size-4" />,
     },
+    {
+      title: "Department",
+      url: "/dashboard/department",
+      icon: <RowsIcon className="size-4" />,
+    },
+   
     {
       title: "Kelola Pengguna",
       url: "/dashboard/users",
