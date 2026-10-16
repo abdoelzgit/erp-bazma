@@ -16,7 +16,7 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { RowsIcon, SignOutIcon, UsersIcon, FileTextIcon } from "@phosphor-icons/react"
+import { RowsIcon, SignOutIcon, UsersIcon, FileTextIcon, CoinsIcon } from "@phosphor-icons/react"
 import { logoutAction } from "@/app/actions/auth"
 import { Role } from "@/lib/roles"
 
@@ -47,6 +47,12 @@ const data: { navMain: NavMain[] } = {
       title: "Department",
       url: "/dashboard/department",
       icon: <RowsIcon className="size-4" />,
+    },
+    {
+      title: "Anggaran",
+      url: "/dashboard/budget",
+      icon: <CoinsIcon className="size-4" />,
+      roles: [Role.ADMIN, Role.FINANCE, Role.EXECUTIVE],
     },
    
     {
