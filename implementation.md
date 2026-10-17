@@ -1,146 +1,4 @@
-﻿# Implementation Plan: Refactor Komponen Menjadi Reusable
-
-## Tujuan
-
-Merapikan `BudgetView`, `PpdForm`, dan `DepartmentView` agar mudah digunakan ulang di halaman atau alur lain. Komponen tampilan menerima data dan callback melalui props; container mengelola state, data, dan aturan bisnis. Refactor mempertahankan perilaku halaman yang ada.
-
-## Kondisi Saat Ini
-
-- `app/dashboard/budget/page.tsx`, `app/dashboard/ppd/page.tsx`, dan `app/dashboard/department/page.tsx` masing-masing merender satu komponen fitur.
-- `components/budget/budget-view.tsx` menggabungkan data contoh, kalkulasi, state filter/edit, aturan validasi, aksi budget, dan seluruh tampilan.
-- `components/ppd/ppd-form.tsx` menggabungkan daftar draf, pemilihan draf, state editor, kalkulasi total, serta tampilan form.
-- `components/department/department-view.tsx` menggabungkan data departemen, filter, state dialog, CRUD departemen, pengelolaan anggota, anggaran, dan tampilan.
-- Data contoh dan state lokal saat ini membuat ketiga UI terikat ke sumber data dan alur spesifiknya.
-
-## Prinsip Desain
-
-1. Pisahkan container (state dan aturan bisnis) dari komponen presentasi (render props dan memanggil callback).
-2. Gunakan tipe domain yang eksplisit untuk data dan props. Hindari props bertipe `any` dan komponen generik yang menyatukan domain berbeda.
-3. Data contoh berada di modul demo/fixture, bukan di dalam komponen presentasi.
-4. Komponen reusable tidak mengambil data sendiri dan tidak bergantung pada rute tertentu.
-5. Pertahankan perilaku, validasi, aksesibilitas, dan tampilan yang sudah ada selama ekstraksi.
-6. Ekstrak bagian yang punya batas tanggung jawab jelas; hindari memecah komponen menjadi banyak file kecil tanpa manfaat penggunaan ulang atau pemeliharaan.
-
-## Struktur Target
-
-Nama dan lokasi final dapat disesuaikan dengan konvensi proyek. Struktur awal yang disarankan:
-
-```text
-components/
-  budget/
-    budget-view.tsx                 # container halaman budget
-    budget-view.types.ts            # tipe domain dan props
-    budget-view.data.ts             # data demo sementara
-    components/
-      budget-period-filter.tsx
-      department-budget-list.tsx
-      account-budget-table.tsx
-      budget-dialogs.tsx
-  ppd/
-    ppd-page.tsx                    # container daftar dan draf aktif
-    ppd-form.tsx                    # editor PPD berbasis props
-    ppd.types.ts
-    ppd.data.ts                     # data demo sementara
-    components/
-      ppd-draft-list.tsx
-  department/
-    department-view.tsx             # container halaman departemen
-    department-view.types.ts
-    department-view.data.ts         # data demo sementara
-    components/
-      department-list.tsx
-      department-detail.tsx
-      department-form-dialog.tsx
-      member-management.tsx
-```
-
-`components/ppd/ppd-form.tsx` saat ini berfungsi seperti halaman lengkap. Perubahan nama menjadi `PpdPage`/`PpdView` dapat dilakukan bila editor form dipisahkan, tetapi halaman route harus tetap merender container lengkap.
-
-## Rencana Implementasi
-
-### Tahap 1 — Tipe domain dan batas data
-
-- Definisikan atau pisahkan tipe `Department`, `Account`, `BudgetEntry`, `DrafLogItem`, `Draft`, `ReportRow`, `Member`, beserta status dan peran yang dipakai.
-- Letakkan tipe bersama pada modul domain yang relevan, bukan membuat satu file tipe besar untuk seluruh fitur.
-- Pindahkan konstanta data contoh dari file komponen ke fixture/demo masing-masing.
-- Tetapkan kontrak props dan callback sebelum memindahkan markup.
-
-**Kriteria selesai:** tidak ada tipe penting yang diduplikasi antar file; presentational component tidak mengimpor data contoh.
-
-### Tahap 2 — BudgetView
-
-- Pertahankan `BudgetView` sebagai container pemilik periode terpilih, departemen terpilih, data budget, status edit/tambah, validasi, dan feedback.
-- Ekstrak UI periode dan pencarian, daftar departemen dengan ringkasan, tabel account budget, riwayat draft, serta dialog tambah/edit ke komponen props-driven.
-- Definisikan callback terarah seperti `onPeriodChange`, `onDepartmentSelect`, `onBudgetSave`, `onBudgetCreate`, dan `onCopyPreviousPeriod`.
-- Pertahankan aturan bahwa budget tidak boleh di bawah nilai dana ditahan + realisasi; pertahankan juga kalkulasi saldo dan total.
-- Pastikan dialog menerima data opsi dan error melalui props, bukan membaca konstanta atau state container secara langsung.
-
-**Kriteria selesai:** container masih mengorkestrasi aksi; bagian UI hasil ekstraksi dapat menerima data berbeda tanpa mengubah implementasinya.
-
-### Tahap 3 — PpdForm
-
-- Pisahkan daftar draf/pencarian/filter/pemilihan dari editor PPD.
-- Ubah editor menjadi form reusable yang menerima `value`/data PPD, daftar account atau opsi terkait, status submit, error, dan callback perubahan/submit.
-- Tentukan satu sumber kebenaran untuk nilai form. Saat draf aktif berubah, nilai editor harus mengikuti draf yang dipilih; perubahan form tidak boleh tanpa sengaja mengubah draf lain.
-- Pisahkan model data draf dari representasi baris laporan bila kebutuhan datanya berbeda.
-- Pertahankan kalkulasi total, validasi field, jenis pembayaran, informasi bank, dan perilaku simpan/kirim yang ada.
-
-**Kriteria selesai:** editor dapat dipakai untuk draf berbeda dengan props, tanpa mengakses daftar draf global atau data contoh secara langsung.
-
-### Tahap 4 — DepartmentView
-
-- Pertahankan `DepartmentView` sebagai container pemilik daftar departemen, filter, pilihan aktif, state dialog, dan aksi CRUD.
-- Ekstrak daftar/filter departemen dan panel detail menjadi komponen presentasi.
-- Buat form departemen yang bisa digunakan untuk tambah dan edit melalui props `initialValue`, `mode`, `onSubmit`, dan `onCancel`.
-- Ekstrak pengelolaan anggota dengan props anggota, filter, dan callback tambah/keluarkan.
-- Pertahankan aturan anggaran yang berlaku saat ini dan tautan atau tampilan budget sesuai desain produk; jangan mengubah hak edit hanya sebagai efek samping refactor.
-
-**Kriteria selesai:** operasi tambah/edit departemen serta tambah/keluarkan anggota tetap diputuskan container dan komponen form menerima data melalui props.
-
-### Tahap 5 — Integrasi halaman
-
-- Pertahankan metadata dan tanggung jawab routing di `app/dashboard/*/page.tsx`.
-- Halaman PPD merender container halaman (misalnya `PpdPage`), bukan editor presentasi tanpa konteks daftar draf.
-- Pastikan import/export konsisten dan tidak ada circular dependency antara container dan subkomponen.
-- Jangan menambahkan fetch/API layer sebagai bagian refactor ini kecuali memang sudah diperlukan; bentuk props disiapkan agar integrasi data bisa dilakukan kemudian.
-
-### Tahap 6 — Pemeriksaan perilaku
-
-Lakukan pemeriksaan setelah tiap fitur diekstrak:
-
-| Modul | Alur yang diperiksa |
-|---|---|
-| Budget | Ganti periode dan departemen, cari account, tambah dan ubah budget, salin budget periode lalu, validasi batas dana ditahan + realisasi, tampilkan feedback dan empty state. |
-| PPD | Pilih draf, cari/filter draf, ubah field dan baris, hitung total, validasi form, simpan/kirim, lalu pilih draf lain dan pastikan nilainya benar. |
-| Departemen | Cari/filter departemen, pilih detail, tambah/edit departemen, tambah/keluarkan anggota, filter anggota, dan tampilkan empty state. |
-
-Periksa juga tampilan responsif, label input, navigasi keyboard, dan identitas key pada daftar setelah komponen dipisah.
-
-## Urutan Kerja yang Disarankan
-
-1. Inventarisasi tipe, aksi, dan state tiap fitur; sepakati kontrak props.
-2. Refactor satu fitur pada satu waktu, mulai dari bagian UI yang punya batas paling jelas.
-3. Setelah ekstraksi, hubungkan kembali container dan halaman route sebelum lanjut ke fitur berikutnya.
-4. Periksa alur utama dan bandingkan perilaku dengan versi sebelum perubahan.
-5. Rapikan nama file dan ekspor setelah bentuk final komponen stabil.
-
-## Risiko dan Mitigasi
-
-- **State form PPD tidak sinkron saat draf berganti:** gunakan nilai draf aktif sebagai sumber data yang jelas dan tangani sinkronisasi saat ID draf berubah.
-- **Validasi berpindah atau terduplikasi:** aturan bisnis tetap berada di container/domain; presentational form hanya menampilkan error dan mengirim input.
-- **Props terlalu besar:** kelompokkan data terkait dalam tipe objek jika membantu keterbacaan, tetapi hindari membuat satu prop `data` tanpa kontrak yang jelas.
-- **Refactor mengubah fitur:** pindahkan markup dan state secara bertahap, serta periksa alur tiap modul sebelum meneruskan.
-- **Komponen terlalu terfragmentasi:** ekstrak berdasarkan tanggung jawab dan kebutuhan reuse yang nyata, bukan hanya ukuran file.
-
-## Di Luar Cakupan
-
-- Integrasi API atau database dan penggantian seluruh data demo.
-- Perubahan kebijakan anggaran, persetujuan PPD, atau hak akses.
-- Perubahan desain visual yang tidak dibutuhkan untuk ekstraksi.
-- Penggabungan tiga fitur ke dalam satu komponen generik.
-
----
-
+﻿
 # Implementation Plan: Import Anggaran dari Excel
 
 ## Tujuan
@@ -238,3 +96,36 @@ Menambahkan alur untuk mengimpor anggaran bulanan dari file Excel ke modul Budge
 - Sinkronisasi atau rollback import dari file historis.
 - Import data realisasi atau transaksi PPD.
 - Mengubah struktur database/backend kecuali dibutuhkan oleh tahap integrasi berikutnya.
+
+## Keputusan Tambahan: Cakupan Import dan Export
+
+Import mendukung dua cakupan yang berbeda:
+
+1. **Import tahunan**: file dapat memuat anggaran untuk beberapa atau seluruh bulan dalam satu tahun. Setiap baris diproses mandiri berdasarkan departemen, account/nama anggaran, tahun, dan bulan.
+2. **Import tabel/periode tertentu**: dari tabel anggaran yang sedang dibuka, pengguna dapat mengekspor data tabel sebagai file lalu mengimpor file revisi untuk rebudgeting. Import dibatasi ke cakupan tabel tersebut, termasuk departemen, tahun, dan bulan/periode yang sedang dipilih.
+
+Keduanya memakai preview, pemetaan, validasi, dan konfirmasi yang sama. Cakupan file ditampilkan dengan jelas sebelum pengguna mengonfirmasi.
+
+### Export dari tabel
+
+- Sediakan aksi **Export** pada setiap tabel yang mendukung ekspor anggaran.
+- Ekspor mengikuti cakupan tabel yang sedang dibuka (misalnya departemen terpilih dan periode filter), tetapi tidak dipersempit oleh pencarian teks atau pagination sehingga file tetap menjadi representasi lengkap tabel/periode tersebut.
+- Sertakan kolom identitas stabil seperti `accountId` dan `departmentId`, beserta nama/kode yang dapat dibaca, tahun, bulan, dan nominal budget. ID dipakai untuk pencocokan; nama/kode membantu pengguna meninjau dan mengedit file.
+- Sertakan petunjuk penggunaan dan format file pada sheet terpisah atau baris/header yang tidak ambigu. Format hasil export dapat diimpor kembali sebagai template.
+
+### Aturan import berdasarkan cakupan
+
+- Import tahunan menerima baris dari banyak bulan pada tahun yang sama. Tampilkan tahun yang terdeteksi dan minta pengguna memastikan cakupan sebelum lanjut. Jika terdapat lebih dari satu tahun, beri ringkasan dan validasi cakupan secara eksplisit.
+- Import dari tabel hanya menerima baris yang cocok dengan departemen dan periode tabel tersebut. Baris di luar cakupan ditandai sebagai error agar tidak mengubah tabel/periode lain secara tidak sengaja.
+- Import bersifat **parsial/upsert**: hanya baris yang tercantum dalam file yang diproses. Baris tabel yang tidak tercantum tidak dihapus, dikosongkan, atau diubah menjadi nol.
+- Untuk baris yang cocok dengan data existing, tampilkan nilai lama dan baru dan ganti nilai setelah konfirmasi. Baris baru ditambahkan sesuai aturan validasi.
+- Gunakan ID stabil dari file export jika tersedia. Untuk file tanpa ID, lakukan pemetaan berdasarkan departemen + account + tahun + bulan dan tandai ketidakcocokan agar ditinjau pengguna.
+- Deteksi duplikat berdasarkan kunci tersebut di dalam file, termasuk jika ID dan label memberi hasil pencocokan yang bertentangan.
+
+### Kriteria penerimaan tambahan
+
+- Pengguna dapat mengekspor tabel/periode yang sedang dibuka, mengedit nominal, lalu mengimpor ulang file itu untuk rebudgeting.
+- File revisi yang hanya memuat beberapa baris hanya mengubah baris tersebut; data lain pada tabel tetap utuh.
+- Import tabel menolak atau meminta pengguna mengecualikan baris dari departemen/periode lain.
+- Import tahunan dapat memproses beberapa bulan dalam satu file, dengan preview dan ringkasan perubahan per bulan.
+- File export mempertahankan identitas yang cukup agar dapat diimpor kembali tanpa mengandalkan kecocokan nama yang rapuh.

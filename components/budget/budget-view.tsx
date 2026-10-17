@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   CheckCircleIcon,
-  CopyIcon,
   MagnifyingGlassIcon,
-  PlusIcon,
+  UploadSimpleIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
@@ -14,12 +13,16 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { formatRupiah } from "@/lib/utils";
 
+import * as XLSX from "xlsx";
 import { DEPARTMENTS, ACCOUNTS, INITIAL_BUDGETS, DRAF_LOGS, MONTHS, YEARS, budgetKey } from "./budget-view.data";
 import { type DepartmentSummary, type BudgetRow } from "./budget-view.types";
 import { DepartmentBudgetList } from "./components/department-budget-list";
 import { BudgetPeriodFilter } from "./components/budget-period-filter";
 import { AccountBudgetTable } from "./components/account-budget-table";
+import { BudgetActionsMenu } from "./components/budget-actions-menu";
 import { CreateBudgetDialog } from "./components/budget-dialogs";
+import { BudgetImportDialog } from "./components/budget-import-dialog";
+import type { BudgetImportScope } from "./budget-import.types";
 
 /* ---------- Helper functions ---------- */
 const pct = (n: number, total: number) =>
@@ -53,6 +56,10 @@ export function BudgetView() {
   const [cAmount, setCAmount] = useState<string>("");
   const [cError, setCError] = useState<string | null>(null);
 
+  // Import dialog state
+  const [importOpen, setImportOpen] = useState(false);
+  const [importScope, setImportScope] = useState<BudgetImportScope>({ type: "annual", year: 2026 });
+
   const showFeedback = (msg: string) => {
     setFeedback(msg);
     setTimeout(() => setFeedback(null), 3500);
@@ -60,6 +67,141 @@ export function BudgetView() {
 
   const resetInteraction = () => {
     setAccSearch("");
+  };
+
+  const openAnnualImport = () => {
+    setImportScope({ type: "annual", year });
+    setImportOpen(true);
+  };
+
+  const openTableImport = () => {
+    const department = DEPARTMENTS.find((d) => d.id === selectedDeptId) ?? DEPARTMENTS[0];
+    setImportScope({
+      type: "table",
+      departmentId: selectedDeptId,
+      departmentName: department.name,
+      month,
+      year,
+    });
+    setImportOpen(true);
+  };
+
+  const handleImportComplete = (preview: any) => {
+    const inScopeRows = preview.rows.filter((r: any) => {
+      if (importScope.type === "annual") return r.year === importScope.year;
+      const rowDepartment = String(r.departmentName).trim().toLowerCase();
+      return r.year === importScope.year && r.month === importScope.month &&
+        rowDepartment === importScope.departmentName.trim().toLowerCase();
+    });
+    const excluded = preview.rows.length - inScopeRows.length;
+    const validRows = inScopeRows.filter((r: any) => r.status === "unmapped" || r.status === "new");
+    
+    const newBudgets: Record<string, { amount: number; realized: number }> = { ...budgets };
+    let added = 0;
+    let updated = 0;
+    const addedAccounts: string[] = [];
+    
+    validRows.forEach((r: any) => {
+      // Find accountId by name match
+      let account = ACCOUNTS.find((a) => a.name === r.accountName);
+      
+      // If not found, create a dynamic account (auto-generate code)
+      if (!account) {
+        // Map department name to deptId
+        const rDept = r.departmentName.toLowerCase();
+        let deptId = "d-2"; // Default to Operasional
+        
+        if (rDept.includes("tekno") || rDept.includes("it")) deptId = "d-3";
+        else if (rDept.includes("pemasar") || rDept.includes("mkt")) deptId = "d-1";
+        else if (rDept.includes("keuang") || rDept.includes("fin")) deptId = "d-4";
+        else if (rDept.includes("operasion") || rDept.includes("ops")) deptId = "d-2";
+        
+        // Generate unique account ID based on existing
+        const maxId = ACCOUNTS.reduce((max, acc) => {
+          const num = parseInt(acc.id.slice(2));
+          return isNaN(num) ? max : Math.max(max, num);
+        }, 0);
+        const newId = `a-${maxId + 1}`;
+        const newCode = `JP-DYN-${String(maxId + 1).padStart(2, "0")}`;
+        
+        account = {
+          id: newId,
+          deptId,
+          code: newCode,
+          name: r.accountName,
+        };
+        addedAccounts.push(r.accountName);
+        console.log("Auto-created account:", account);
+      }
+      
+      const key = budgetKey(account.id, r.year, r.month);
+      const existing = newBudgets[key];
+      
+      // Upsert: Replace if exists (update), add if not (new)
+      newBudgets[key] = { 
+        amount: r.amount,
+        realized: existing?.realized ?? 0 
+      };
+      
+      if (existing) {
+        updated++;
+      } else {
+        added++;
+      }
+    });
+
+    setBudgets(newBudgets);
+    const firstRow = validRows[0];
+    if (firstRow && (firstRow.year !== year || firstRow.month !== month)) {
+      setYear(firstRow.year);
+      setMonth(firstRow.month);
+    }
+    
+    showFeedback(`Import ${added} baru, ${updated} diperbarui${excluded > 0 ? `, ${excluded} baris di luar cakupan dilewati` : ""}${addedAccounts.length > 0 ? `, ${addedAccounts.length} akun baru` : ""}.`);
+  };
+
+  const handleExportBudget = () => {
+    const dept = DEPARTMENTS.find((d) => d.id === selectedDeptId) ?? DEPARTMENTS[0];
+    const data: any[] = [];
+
+    ACCOUNTS.filter((acc) => acc.deptId === selectedDeptId).forEach((acc) => {
+      const entry = budgets[budgetKey(acc.id, year, month)];
+      if (entry) {
+        data.push({
+          "ID Departemen": dept.id,
+          "Departemen": dept.name,
+          "ID Anggaran": acc.id,
+          "Nama Anggaran": acc.name,
+          "Kode Akun": acc.code,
+          "Bulan": MONTHS[month - 1],
+          "Tahun": year,
+          "Nominal": entry.amount,
+        });
+      }
+    });
+
+    if (data.length === 0) {
+      showFeedback("Tidak ada data untuk diekspor pada periode ini.");
+      return;
+    }
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Budget");
+    
+    ws["!cols"] = [
+      { wch: 16 },
+      { wch: 15 },
+      { wch: 14 },
+      { wch: 35 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 8 },
+      { wch: 15 },
+    ];
+
+    XLSX.writeFile(wb, `Budget_${dept.name}_${MONTHS[month - 1]}_${year}.xlsx`);
+    showFeedback(`Export berhasil: ${data.length} data diekspor.`);
   };
 
   /* ---------- Data derived ---------- */
@@ -253,14 +395,12 @@ export function BudgetView() {
           </div>
 
           <Button
-            onClick={openCreate}
-            disabled={addDisabled}
-            title={addDisabled ? "Semua account sudah punya budget bulan ini" : undefined}
+            onClick={openAnnualImport}
             variant="outline"
-            className="w-full justify-center gap-1.5 text-xs font-semibold h-9"
+            className="w-full justify-center gap-1.5 text-xs font-semibold h-9 border-blue-200 text-blue-700 hover:bg-blue-50"
           >
-            <PlusIcon className="size-3.5" />
-            Tambah budget
+            <UploadSimpleIcon className="size-3.5" />
+            Import anggaran 1 tahun
           </Button>
 
           <BudgetPeriodFilter
@@ -314,15 +454,7 @@ export function BudgetView() {
                 </Badge>
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopyPrevMonth}
-                className="gap-1.5 text-xs h-8"
-              >
-                <CopyIcon className="size-3.5" />
-                Salin dari bulan lalu
-              </Button>
+              
             </div>
 
             <p className="text-xs text-muted-foreground">
@@ -417,18 +549,12 @@ export function BudgetView() {
                   Budget diatur per account dan per bulan
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={openCreate}
-                  disabled={addDisabled}
-                  className="gap-1.5 text-xs h-7 font-medium"
-                >
-                  <PlusIcon className="size-3.5" />
-                  Tambah budget
-                </Button>
-              </div>
+              <BudgetActionsMenu
+                onExport={handleExportBudget}
+                onImport={openTableImport}
+                onCreate={openCreate}
+                createDisabled={addDisabled}
+              />
             </div>
 
             <div className="relative">
@@ -537,6 +663,14 @@ export function BudgetView() {
         onAccountChange={setCAccount}
         onAmountChange={setCAmount}
         onErrorChange={setCError}
+      />
+
+      {/* DIALOG: Import dari Excel */}
+      <BudgetImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImportComplete={handleImportComplete}
+        scope={importScope}
       />
     </div>
   );

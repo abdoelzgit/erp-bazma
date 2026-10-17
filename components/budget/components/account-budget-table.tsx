@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { PencilSimpleIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
@@ -66,9 +66,8 @@ export function AccountBudgetTable({
           {rows.map((r) => {
             const isEditing = editingId === r.account.id;
             return (
-              <>
+              <React.Fragment key={r.account.id}>
                 <tr
-                  key={r.account.id}
                   className={isEditing ? "bg-primary/5" : "hover:bg-muted/30 transition-colors"}
                 >
                   <td className="p-3 font-mono text-[11px]">{r.account.code}</td>
@@ -154,7 +153,7 @@ export function AccountBudgetTable({
                     </td>
                   </tr>
                 )}
-              </>
+                        </React.Fragment>
             );
           })}
 
