@@ -2,21 +2,28 @@
 
 import { useState, useMemo } from "react";
 import { CheckCircleIcon, PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
-import type { Department, Member } from "./department-view.types";
-import { INITIAL_DEPARTMENTS } from "./department-view.data";
+import type { Department } from "./department-view.types";
 import { DepartmentSidebar } from "./components/department-sidebar";
 import { DepartmentInfoCard } from "./components/department-info-card";
 import { DepartmentBudgetCard } from "./components/department-budget-card";
 import { DepartmentMembersCard } from "./components/department-members-card";
 import { DepartmentDialogs } from "./components/department-dialogs";
 import { Badge } from "@/components/ui/badge";
+import {
+  addDepartmentMemberAction,
+  archiveDepartmentAction,
+  createDepartmentAction,
+  removeDepartmentMemberAction,
+  updateDepartmentAction,
+  updateDepartmentAnnualBudgetAction,
+} from "@/app/actions/departments";
 
-export function DepartmentView() {
-  const [departments, setDepartments] = useState<Department[]>(INITIAL_DEPARTMENTS);
-  const [selectedDeptId, setSelectedDeptId] = useState<string>("dept-1");
+export function DepartmentView({ initialDepartments }: { initialDepartments: Department[] }) {
+  const [departments, setDepartments] = useState<Department[]>(initialDepartments);
+  const [selectedDeptId, setSelectedDeptId] = useState<string>(initialDepartments[0]?.id ?? "");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("Semua");
-  const [yearFilter, setYearFilter] = useState<string>("2026");
+  const [yearFilter, setYearFilter] = useState<string>(() => String(new Date().getFullYear()));
   const [memberSearch, setMemberSearch] = useState<string>("");
   const [memberRoleFilter, setMemberRoleFilter] = useState<string>("Semua");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -85,39 +92,19 @@ export function DepartmentView() {
     setIsAddDeptOpen(true);
   };
 
-  const handleSaveNewDept = (e: React.FormEvent) => {
+  const handleSaveNewDept = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!deptForm.name || !deptForm.code) return;
+    const result = await createDepartmentAction({ ...deptForm, year: Number(yearFilter) || new Date().getFullYear() });
+    if (result.error || !result.data) {
+      showFeedback(result.error ?? "Gagal membuat departemen.");
+      return;
+    }
 
-    const newDept: Department = {
-      id: `dept-${Date.now()}`,
-      name: deptForm.name,
-      code: deptForm.code.toUpperCase(),
-      status: deptForm.status,
-      pic: deptForm.pic || "-",
-      description: deptForm.description,
-      totalBudget: Number(deptForm.totalBudget) || 0,
-      usedBudget: 0,
-      year: 2026,
-      updatedAt: "Hari ini",
-      updatedBy: "Admin",
-      members: deptForm.pic
-        ? [
-            {
-              id: `mem-${Date.now()}`,
-              name: deptForm.pic,
-              email: `${deptForm.pic.toLowerCase().replace(/\s+/g, ".")}@nusantara.co.id`,
-              role: "Penanggung jawab",
-              status: "Aktif",
-            },
-          ]
-        : [],
-    };
-
-    setDepartments((prev) => [newDept, ...prev]);
-    setSelectedDeptId(newDept.id);
+    setDepartments((prev) => [result.data!, ...prev]);
+    setSelectedDeptId(result.data.id);
     setIsAddDeptOpen(false);
-    showFeedback(`Departemen ${newDept.name} berhasil ditambahkan.`);
+    showFeedback(`Departemen ${result.data.name} berhasil ditambahkan.`);
   };
 
   const handleOpenEditDept = () => {
@@ -133,40 +120,39 @@ export function DepartmentView() {
     setIsEditDeptOpen(true);
   };
 
-  const handleSaveEditDept = (e: React.FormEvent) => {
+  const handleSaveEditDept = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeDept) return;
-
-    setDepartments((prev) =>
-      prev.map((d) =>
-        d.id === activeDept.id
-          ? {
-              ...d,
-              name: deptForm.name,
-              code: deptForm.code,
-              pic: deptForm.pic,
-              description: deptForm.description,
-              status: deptForm.status,
-              updatedAt: "Hari ini",
-            }
-          : d
-      )
-    );
+    const result = await updateDepartmentAction({
+      id: activeDept.id,
+      ...deptForm,
+      year: activeDept.year,
+    });
+    if (result.error || !result.data) {
+      showFeedback(result.error ?? "Gagal memperbarui departemen.");
+      return;
+    }
+    setDepartments((prev) => prev.map((department) => department.id === activeDept.id ? result.data! : department));
     setIsEditDeptOpen(false);
     showFeedback("Informasi departemen berhasil diperbarui.");
   };
 
-  const handleDeleteDept = () => {
+  const handleDeleteDept = async () => {
     if (!activeDept) return;
-    if (departments.length <= 1) {
+    if (departments.filter((department) => department.status === "Aktif").length <= 1) {
       alert("Harus ada minimal 1 departemen di sistem.");
       return;
     }
-    if (confirm(`Apakah Anda yakin ingin menghapus departemen ${activeDept.name}?`)) {
-      const remaining = departments.filter((d) => d.id !== activeDept.id);
-      setDepartments(remaining);
-      setSelectedDeptId(remaining[0].id);
-      showFeedback(`Departemen ${activeDept.name} telah dihapus.`);
+    if (confirm(`Nonaktifkan departemen ${activeDept.name}? Data anggaran dan riwayatnya akan tetap disimpan.`)) {
+      const result = await archiveDepartmentAction(activeDept.id);
+      if (result.error) {
+        showFeedback(result.error);
+        return;
+      }
+      setDepartments((prev) => prev.map((department) => department.id === activeDept.id
+        ? { ...department, status: "Nonaktif", updatedAt: "Hari ini" }
+        : department));
+      showFeedback(`Departemen ${activeDept.name} dinonaktifkan.`);
     }
   };
 
@@ -176,44 +162,52 @@ export function DepartmentView() {
     setIsAdjustBudgetOpen(true);
   };
 
-  const handleSaveAdjustBudget = (e: React.FormEvent) => {
+  const handleSaveAdjustBudget = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeDept) return;
-
-    setDepartments((prev) =>
-      prev.map((d) =>
-        d.id === activeDept.id
-          ? {
-              ...d,
-              totalBudget: Number(budgetForm),
-              updatedAt: "Hari ini",
-            }
-          : d
-      )
-    );
+    const result = await updateDepartmentAnnualBudgetAction({
+      departmentId: activeDept.id,
+      year: activeDept.year,
+      amount: Number(budgetForm),
+    });
+    if (result.error) {
+      showFeedback(result.error);
+      return;
+    }
+    setDepartments((prev) => prev.map((department) => department.id === activeDept.id
+      ? { ...department, totalBudget: Number(budgetForm), updatedAt: "Hari ini" }
+      : department));
     setIsAdjustBudgetOpen(false);
     showFeedback("Anggaran departemen berhasil disesuaikan.");
   };
 
-  const handleAddMember = (e: React.FormEvent) => {
+  const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!memberForm.name || !memberForm.email || !activeDept) return;
-
-    const newMember: Member = {
-      id: `mem-${Date.now()}`,
+    const result = await addDepartmentMemberAction({
+      departmentId: activeDept.id,
       name: memberForm.name,
       email: memberForm.email,
       role: memberForm.role,
-      status: "Aktif",
-    };
-
+      year: activeDept.year,
+    });
+    if (result.error || !result.data) {
+      showFeedback(result.error ?? "Gagal menambahkan anggota.");
+      return;
+    }
+    const newMember = result.data;
     setDepartments((prev) =>
       prev.map((d) =>
         d.id === activeDept.id
           ? {
               ...d,
-              members: [...d.members, newMember],
-              pic: memberForm.role === "Penanggung jawab" ? memberForm.name : d.pic,
+              members: [
+                ...d.members.map((member) => memberForm.role === "Penanggung jawab" && member.role === "Penanggung jawab"
+                  ? { ...member, role: "Anggota" as const }
+                  : member),
+                newMember,
+              ],
+              pic: memberForm.role === "Penanggung jawab" ? newMember.name : d.pic,
             }
           : d
       )
@@ -223,15 +217,24 @@ export function DepartmentView() {
     showFeedback(`${newMember.name} berhasil ditambahkan ke departemen.`);
   };
 
-  const handleRemoveMember = (memberId: string, memberName: string) => {
+  const handleRemoveMember = async (memberId: string, memberName: string) => {
     if (!activeDept) return;
     if (confirm(`Keluarkan ${memberName} dari departemen ${activeDept.name}?`)) {
+      const memberToRemove = activeDept.members.find((member) => member.id === memberId);
+      const result = await removeDepartmentMemberAction({ departmentId: activeDept.id, memberId });
+      if (result.error) {
+        showFeedback(result.error);
+        return;
+      }
       setDepartments((prev) =>
         prev.map((d) =>
           d.id === activeDept.id
             ? {
                 ...d,
                 members: d.members.filter((m) => m.id !== memberId),
+              pic: memberToRemove?.role === "Penanggung jawab"
+                ? d.members.find((member) => member.id !== memberId && member.role === "Penanggung jawab")?.name ?? "-"
+                : d.pic,
               }
             : d
         )
@@ -296,7 +299,7 @@ export function DepartmentView() {
                     onClick={handleDeleteDept}
                     className="text-destructive hover:bg-destructive/10 border-destructive/30 text-xs h-8 px-3 rounded-md border inline-flex items-center"
                   >
-                    Hapus
+                    Nonaktifkan
                   </button>
                 </div>
               </div>

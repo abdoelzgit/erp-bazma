@@ -12,12 +12,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Department, Account, BudgetRow } from "../budget-view.types";
-import { MONTHS } from "../budget-view.data";
+import { MONTHS } from "../budget-view.constants";
 
 export type CreateBudgetDialogProps = {
   open: boolean;
   onClose: () => void;
-  onSubmit: (deptId: string, accountId: string, amount: number) => void;
+  onSubmit: (deptId: string, accountId: string, amount: number) => void | Promise<void>;
   month: number;
   year: number;
   departmentsWithMissing: Department[];
@@ -51,9 +51,9 @@ export function CreateBudgetDialog({
 }: CreateBudgetDialogProps) {
   if (!open) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(selectedDeptId, selectedAccountId, Number(amount));
+    await onSubmit(selectedDeptId, selectedAccountId, Number(amount));
   };
 
   return (

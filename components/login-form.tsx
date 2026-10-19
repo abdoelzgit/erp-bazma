@@ -16,8 +16,9 @@ import { SpinnerGapIcon, WarningCircleIcon } from "@phosphor-icons/react"
 
 export function LoginForm({
   className,
+  callbackUrl,
   ...props
-}: React.ComponentProps<"form">) {
+}: React.ComponentProps<"form"> & { callbackUrl?: string }) {
   const [state, formAction, isPending] = useActionState<
     AuthActionResponse | null,
     FormData
@@ -29,6 +30,7 @@ export function LoginForm({
       className={cn("flex flex-col gap-6", className)}
       {...props}
     >
+      <input type="hidden" name="callbackUrl" value={callbackUrl ?? ""} />
       <FieldGroup>
         <div className="flex flex-col items-center gap-1 text-center">
           <h1 className="text-2xl font-bold">Masuk ke Akun Anda</h1>

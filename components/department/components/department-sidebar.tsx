@@ -64,8 +64,8 @@ export function DepartmentSidebar({
           <div className="space-y-1">
             <label htmlFor="dept-year-filter" className="text-[11px] font-medium text-muted-foreground">Tahun anggaran</label>
             <select id="dept-year-filter" value={year} onChange={(e) => onYearChange(e.target.value)} className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs focus:outline-none">
-              <option value="2026">2026</option>
-              <option value="2025">2025</option>
+              <option value={String(new Date().getFullYear())}>{new Date().getFullYear()}</option>
+              <option value={String(new Date().getFullYear() - 1)}>{new Date().getFullYear() - 1}</option>
               <option value="Semua">Semua</option>
             </select>
           </div>

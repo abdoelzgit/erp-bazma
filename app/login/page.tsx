@@ -1,9 +1,13 @@
 "use client"
-
+import { Suspense } from "react";
 import { LoginForm } from "@/components/login-form"
 import { RowsIcon } from "@phosphor-icons/react"
 
-export default function LoginPage() {
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string | string[] }>;
+}) {
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col gap-4 p-6 md:p-10">
@@ -17,7 +21,9 @@ export default function LoginPage() {
         </div>
         <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-xs">
-            <LoginForm />
+            <Suspense fallback={<LoginForm />}>
+              <LoginFormFromQuery searchParams={searchParams} />
+            </Suspense>
           </div>
         </div>
       </div>
@@ -33,4 +39,14 @@ export default function LoginPage() {
       </div>
     </div>
   )
+}
+
+async function LoginFormFromQuery({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const callbackUrl = Array.isArray(params.callbackUrl) ? params.callbackUrl[0] : params.callbackUrl;
+  return <LoginForm callbackUrl={callbackUrl} />;
 }

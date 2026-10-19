@@ -35,7 +35,7 @@ type NavMain = {
   roles?: Role[]
 }
 
-// This is sample data.
+// Navigation configuration is static; business data is loaded from the database.
 const data: { navMain: NavMain[] } = {
   navMain: [
     {

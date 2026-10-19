@@ -69,7 +69,7 @@ export function PpdFormDetails({
             </SelectTrigger>
             <SelectContent>
               {departments.map((dept) => (
-                <SelectItem key={dept.id} value={dept.name}>
+                <SelectItem key={dept.id} value={dept.id}>
                   {dept.name}
                 </SelectItem>
               ))}

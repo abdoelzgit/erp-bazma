@@ -9,6 +9,7 @@ type BudgetActionsMenuProps = {
   onImport: () => void;
   onCreate: () => void;
   createDisabled: boolean;
+  canManage: boolean;
 };
 
 export function BudgetActionsMenu({
@@ -16,10 +17,11 @@ export function BudgetActionsMenu({
   onImport,
   onCreate,
   createDisabled,
+  canManage,
 }: BudgetActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -74,11 +76,11 @@ export function BudgetActionsMenu({
             <DownloadSimpleIcon className="size-3.5" />
             Export tabel
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => runAction(onImport)} className="h-8 w-full justify-start gap-2 text-xs">
+          {canManage && <Button variant="ghost" size="sm" onClick={() => runAction(onImport)} className="h-8 w-full justify-start gap-2 text-xs">
             <UploadSimpleIcon className="size-3.5" />
             Import tabel
-          </Button>
-          <Button
+          </Button>}
+          {canManage && <Button
             variant="ghost"
             size="sm"
             onClick={() => runAction(onCreate)}
@@ -88,7 +90,7 @@ export function BudgetActionsMenu({
           >
             <PlusIcon className="size-3.5" />
             Tambah budget
-          </Button>
+          </Button>}
         </div>
       )}
     </div>

@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MONTHS, YEARS } from "../budget-view.data";
+import { MONTHS, YEARS } from "../budget-view.constants";
 
 export type BudgetPeriodFilterProps = {
   month: number;

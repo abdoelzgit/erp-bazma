@@ -68,7 +68,9 @@ const parseAmount = (value: string | number): number | null => {
 const detectColumns = (headers: string[]): Record<string, string> => {
   const mapping: Record<string, string> = {};
   const normalizedHeaders = headers.map(h => ({ original: h, normalized: normalizeHeader(h) }));
-  
+
+  const accountCodeKeywords = ["account code", "kode account", "kode akun"];
+  const deptCodeKeywords = ["department code", "kode department", "kode departemen", "kode dept"];
   const accountKeywords = ["account", "anggaran", "budget", "name", "nama"];
   const deptKeywords = ["dept", "department", "departemen"];
   const monthKeywords = ["month", "bulan", "bln"];
@@ -76,8 +78,10 @@ const detectColumns = (headers: string[]): Record<string, string> => {
   const amountKeywords = ["amount", "nominal", "jumlah", "nilai", "total"];
   
   normalizedHeaders.forEach(({ normalized, original }) => {
-    if (accountKeywords.some(k => normalized.includes(k))) mapping.accountName = original;
+    if (accountCodeKeywords.some(k => normalized === k)) mapping.accountCode = original;
+    else if (deptCodeKeywords.some(k => normalized === k)) mapping.departmentCode = original;
     else if (deptKeywords.some(k => normalized.includes(k))) mapping.department = original;
+    else if (accountKeywords.some(k => normalized.includes(k))) mapping.accountName = original;
     else if (monthKeywords.some(k => normalized.includes(k))) mapping.month = original;
     else if (yearKeywords.some(k => normalized.includes(k))) mapping.year = original;
     else if (amountKeywords.some(k => normalized.includes(k))) mapping.amount = original;
@@ -90,11 +94,11 @@ const detectColumns = (headers: string[]): Record<string, string> => {
 const validateRow = (row: Record<string, any>, mapping: Record<string, string>): ImportRowError[] => {
   const errors: ImportRowError[] = [];
   
-  if (!mapping.accountName || !row[mapping.accountName]) {
+  if ((!mapping.accountName || !row[mapping.accountName]) && (!mapping.accountCode || !row[mapping.accountCode])) {
     errors.push({ rowNumber: row.__rowNum__, field: mapping.accountName || "account", message: "Nama anggaran kosong" });
   }
   
-  if (!mapping.department || !row[mapping.department]) {
+  if ((!mapping.department || !row[mapping.department]) && (!mapping.departmentCode || !row[mapping.departmentCode])) {
     errors.push({ rowNumber: row.__rowNum__, field: mapping.department || "department", message: "Nama departemen kosong" });
   }
   
@@ -152,11 +156,14 @@ export function parseBudgetExcel(file: File): Promise<BudgetImportPreview> {
         const mapping = detectColumns(headers);
         
         // Cek apakah semua kolom penting terdeteksi
-        const requiredCols = ["accountName", "department", "month", "year", "amount"];
-        const missingCols = requiredCols.filter(col => !mapping[col]);
+        const missingCols = [
+          ...(!mapping.accountName && !mapping.accountCode ? ["Nama Anggaran atau Kode Akun"] : []),
+          ...(!mapping.department && !mapping.departmentCode ? ["Departemen atau Kode Departemen"] : []),
+          ...(["month", "year", "amount"].filter(col => !mapping[col])),
+        ];
         
         if (missingCols.length > 0) {
-          reject(new Error(`Kolom tidak terdeteksi: ${missingCols.join(", ")}. Harus ada: Nama Anggaran, Departemen, Bulan, Tahun, Nominal`));
+          reject(new Error(`Kolom tidak terdeteksi: ${missingCols.join(", ")}. Harus ada identitas anggaran, departemen, bulan, tahun, dan nominal.`));
           return;
         }
         
@@ -177,12 +184,14 @@ export function parseBudgetExcel(file: File): Promise<BudgetImportPreview> {
           // Parse nilai
           const accountName = rowObj[mapping.accountName]?.toString().trim() ?? "";
           const departmentName = rowObj[mapping.department]?.toString().trim() ?? "";
+          const accountCode = mapping.accountCode ? rowObj[mapping.accountCode]?.toString().trim() : undefined;
+          const departmentCode = mapping.departmentCode ? rowObj[mapping.departmentCode]?.toString().trim() : undefined;
           const month = parseMonth(rowObj[mapping.month]);
           const year = parseYear(rowObj[mapping.year]);
           const amount = parseAmount(rowObj[mapping.amount]);
           
           // Key untuk deteksi duplikat
-          const rowKey = `${accountName}|${departmentName}|${year}|${month}`;
+          const rowKey = `${accountCode || accountName}|${departmentCode || departmentName}|${year}|${month}`;
           
           // Cek duplikat
           let rowStatus: ImportRowStatus = status;
@@ -194,6 +203,8 @@ export function parseBudgetExcel(file: File): Promise<BudgetImportPreview> {
           
           parsedRows.push({
             rowNumber: idx + 2,
+            accountCode,
+            departmentCode,
             accountName,
             departmentName,
             month: month ?? 0,

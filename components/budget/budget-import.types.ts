@@ -10,6 +10,8 @@ export type ImportRowStatus =
 
 export type ParsedBudgetRow = {
   rowNumber: number;           // Nomor baris di Excel (1-based)
+  accountCode?: string;        // Kode akun dari file export aplikasi
+  departmentCode?: string;     // Kode departemen dari file export aplikasi
   accountName: string;         // Nama anggaran/account
   departmentName: string;      // Nama departemen
   month: number;               // 1-12
@@ -65,4 +67,4 @@ export type ImportOptions = {
 
 export type BudgetImportScope =
   | { type: "annual"; year: number }
-  | { type: "table"; departmentId: string; departmentName: string; month: number; year: number };
+  | { type: "table"; departmentId: string; departmentName: string; departmentCode: string; month: number; year: number };

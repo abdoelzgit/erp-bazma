@@ -12,9 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { formatRupiah } from "@/lib/utils";
+import { createMonthlyBudgetAction, importMonthlyBudgetsAction, updateMonthlyBudgetAction } from "@/app/actions/budget";
+import type { BudgetPageData } from "@/lib/budget-data";
 
 import * as XLSX from "xlsx";
-import { DEPARTMENTS, ACCOUNTS, INITIAL_BUDGETS, DRAF_LOGS, MONTHS, YEARS, budgetKey } from "./budget-view.data";
+import { MONTHS, YEARS } from "./budget-view.constants";
+import { budgetKey } from "@/lib/budget-utils";
 import { type DepartmentSummary, type BudgetRow } from "./budget-view.types";
 import { DepartmentBudgetList } from "./components/department-budget-list";
 import { BudgetPeriodFilter } from "./components/budget-period-filter";
@@ -39,13 +42,18 @@ const sumRows = (rows: BudgetRow[]) =>
     { amount: 0, draf: 0, realized: 0, saldo: 0 },
   );
 
-export function BudgetView() {
-  const [year, setYear] = useState(2026);
-  const [month, setMonth] = useState(10);
-  const [selectedDeptId, setSelectedDeptId] = useState("d-3");
+export function BudgetView({ initialData, canManage }: { initialData: BudgetPageData; canManage: boolean }) {
+  const [year, setYear] = useState(() => new Date().getFullYear());
+  const [month, setMonth] = useState(() => new Date().getMonth() + 1);
+  const [selectedDeptId, setSelectedDeptId] = useState(
+    initialData.departments[0]?.id ?? "",
+  );
   const [deptSearch, setDeptSearch] = useState("");
   const [accSearch, setAccSearch] = useState("");
-  const [budgets, setBudgets] = useState<Record<string, { amount: number; realized: number }>>(INITIAL_BUDGETS);
+  const departments = initialData.departments;
+  const accounts = initialData.accounts;
+  const drafLogs = initialData.drafLogs;
+  const [budgets, setBudgets] = useState(initialData.budgets);
 
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -58,7 +66,7 @@ export function BudgetView() {
 
   // Import dialog state
   const [importOpen, setImportOpen] = useState(false);
-  const [importScope, setImportScope] = useState<BudgetImportScope>({ type: "annual", year: 2026 });
+  const [importScope, setImportScope] = useState<BudgetImportScope>({ type: "annual", year: new Date().getFullYear() });
 
   const showFeedback = (msg: string) => {
     setFeedback(msg);
@@ -75,102 +83,93 @@ export function BudgetView() {
   };
 
   const openTableImport = () => {
-    const department = DEPARTMENTS.find((d) => d.id === selectedDeptId) ?? DEPARTMENTS[0];
+    const department = departments.find((d) => d.id === selectedDeptId) ?? departments[0];
+    if (!department) return showFeedback("Tambahkan departemen sebelum mengimpor budget.");
     setImportScope({
       type: "table",
       departmentId: selectedDeptId,
       departmentName: department.name,
+      departmentCode: department.code,
       month,
       year,
     });
     setImportOpen(true);
   };
 
-  const handleImportComplete = (preview: any) => {
+  const handleImportComplete = async (preview: any) => {
     const inScopeRows = preview.rows.filter((r: any) => {
       if (importScope.type === "annual") return r.year === importScope.year;
+      const rowDepartmentCode = String(r.departmentCode ?? "").trim();
       const rowDepartment = String(r.departmentName).trim().toLowerCase();
-      return r.year === importScope.year && r.month === importScope.month &&
-        rowDepartment === importScope.departmentName.trim().toLowerCase();
+      const departmentMatches = rowDepartmentCode
+        ? rowDepartmentCode.toLowerCase() === importScope.departmentCode.trim().toLowerCase()
+        : rowDepartment === importScope.departmentName.trim().toLowerCase();
+      return r.year === importScope.year && r.month === importScope.month && departmentMatches;
     });
-    const excluded = preview.rows.length - inScopeRows.length;
-    const validRows = inScopeRows.filter((r: any) => r.status === "unmapped" || r.status === "new");
-    
-    const newBudgets: Record<string, { amount: number; realized: number }> = { ...budgets };
+    const validRows = inScopeRows.filter((row: any) => row.status === "unmapped" || row.status === "new");
+    const mappedRows = validRows.flatMap((row: any) => {
+      const departmentByCode = row.departmentCode ? departments.find((item) => item.code.trim().toLowerCase() === String(row.departmentCode).trim().toLowerCase()) : undefined;
+      const department = departmentByCode
+        ?? departments.find((item) => item.name.trim().toLowerCase() === String(row.departmentName).trim().toLowerCase());
+      const accountByCode = row.accountCode
+        ? accounts.find((item) => item.code.trim().toLowerCase() === String(row.accountCode).trim().toLowerCase() && (!department || item.deptId === department.id))
+        : undefined;
+      if (row.accountCode && !accountByCode) return [];
+      if (accountByCode && department && accountByCode.deptId !== department.id) return [];
+      const account = accountByCode ?? accounts.find((item) => item.deptId === department?.id && item.name.trim().toLowerCase() === String(row.accountName).trim().toLowerCase());
+      return account ? [{ accountId: account.id, year: row.year, month: row.month, amount: row.amount }] : [];
+    });
+    const unmatched = validRows.length - mappedRows.length;
+    if (mappedRows.length === 0) {
+      showFeedback("Tidak ada baris import yang cocok dengan departemen dan account terdaftar.");
+      return;
+    }
+
+    const scope = importScope.type === "annual"
+      ? importScope
+      : { type: "table" as const, departmentId: importScope.departmentId, year: importScope.year, month: importScope.month };
+    const result = await importMonthlyBudgetsAction({ scope, rows: mappedRows });
+    if (result.error) {
+      showFeedback(result.error);
+      return;
+    }
+
     let added = 0;
     let updated = 0;
-    const addedAccounts: string[] = [];
-    
-    validRows.forEach((r: any) => {
-      // Find accountId by name match
-      let account = ACCOUNTS.find((a) => a.name === r.accountName);
-      
-      // If not found, create a dynamic account (auto-generate code)
-      if (!account) {
-        // Map department name to deptId
-        const rDept = r.departmentName.toLowerCase();
-        let deptId = "d-2"; // Default to Operasional
-        
-        if (rDept.includes("tekno") || rDept.includes("it")) deptId = "d-3";
-        else if (rDept.includes("pemasar") || rDept.includes("mkt")) deptId = "d-1";
-        else if (rDept.includes("keuang") || rDept.includes("fin")) deptId = "d-4";
-        else if (rDept.includes("operasion") || rDept.includes("ops")) deptId = "d-2";
-        
-        // Generate unique account ID based on existing
-        const maxId = ACCOUNTS.reduce((max, acc) => {
-          const num = parseInt(acc.id.slice(2));
-          return isNaN(num) ? max : Math.max(max, num);
-        }, 0);
-        const newId = `a-${maxId + 1}`;
-        const newCode = `JP-DYN-${String(maxId + 1).padStart(2, "0")}`;
-        
-        account = {
-          id: newId,
-          deptId,
-          code: newCode,
-          name: r.accountName,
-        };
-        addedAccounts.push(r.accountName);
-        console.log("Auto-created account:", account);
+    for (const row of mappedRows) {
+      if (budgets[budgetKey(row.accountId, row.year, row.month)]) updated++;
+      else added++;
+    }
+    setBudgets((previous) => {
+      const next = { ...previous };
+      for (const row of mappedRows) {
+        const rowKey = budgetKey(row.accountId, row.year, row.month);
+        next[rowKey] = { amount: row.amount, realized: previous[rowKey]?.realized ?? 0 };
       }
-      
-      const key = budgetKey(account.id, r.year, r.month);
-      const existing = newBudgets[key];
-      
-      // Upsert: Replace if exists (update), add if not (new)
-      newBudgets[key] = { 
-        amount: r.amount,
-        realized: existing?.realized ?? 0 
-      };
-      
-      if (existing) {
-        updated++;
-      } else {
-        added++;
-      }
+      return next;
     });
 
-    setBudgets(newBudgets);
     const firstRow = validRows[0];
     if (firstRow && (firstRow.year !== year || firstRow.month !== month)) {
       setYear(firstRow.year);
       setMonth(firstRow.month);
     }
-    
-    showFeedback(`Import ${added} baru, ${updated} diperbarui${excluded > 0 ? `, ${excluded} baris di luar cakupan dilewati` : ""}${addedAccounts.length > 0 ? `, ${addedAccounts.length} akun baru` : ""}.`);
+
+    const excluded = preview.rows.length - inScopeRows.length;
+    showFeedback(`Import ${added} baru, ${updated} diperbarui${excluded > 0 ? `, ${excluded} di luar cakupan dilewati` : ""}${unmatched > 0 ? `, ${unmatched} account tidak cocok dilewati` : ""}.`);
   };
 
   const handleExportBudget = () => {
-    const dept = DEPARTMENTS.find((d) => d.id === selectedDeptId) ?? DEPARTMENTS[0];
+    const dept = departments.find((d) => d.id === selectedDeptId) ?? departments[0];
+    if (!dept) return showFeedback("Tidak ada departemen untuk diekspor.");
     const data: any[] = [];
 
-    ACCOUNTS.filter((acc) => acc.deptId === selectedDeptId).forEach((acc) => {
+    accounts.filter((acc) => acc.deptId === selectedDeptId).forEach((acc) => {
       const entry = budgets[budgetKey(acc.id, year, month)];
       if (entry) {
         data.push({
-          "ID Departemen": dept.id,
+          "Kode Departemen": dept.code,
           "Departemen": dept.name,
-          "ID Anggaran": acc.id,
           "Nama Anggaran": acc.name,
           "Kode Akun": acc.code,
           "Bulan": MONTHS[month - 1],
@@ -190,9 +189,7 @@ export function BudgetView() {
     XLSX.utils.book_append_sheet(wb, ws, "Budget");
     
     ws["!cols"] = [
-      { wch: 16 },
       { wch: 15 },
-      { wch: 14 },
       { wch: 35 },
       { wch: 12 },
       { wch: 12 },
@@ -207,9 +204,9 @@ export function BudgetView() {
   /* ---------- Data derived ---------- */
   const allRows: BudgetRow[] = useMemo(
     () =>
-      ACCOUNTS.map((account) => {
+      accounts.map((account) => {
         const entry = budgets[budgetKey(account.id, year, month)];
-        const draf = DRAF_LOGS.filter(
+        const draf = drafLogs.filter(
           (l) => l.accountId === account.id && l.year === year && l.month === month,
         ).reduce((s, l) => s + l.amount, 0);
         const amount = entry?.amount ?? 0;
@@ -228,7 +225,7 @@ export function BudgetView() {
 
   const deptSummaries: DepartmentSummary[] = useMemo(
     () =>
-      DEPARTMENTS.map((dept) => {
+      departments.map((dept) => {
         const rows = allRows.filter((r) => r.account.deptId === dept.id);
         return {
           dept,
@@ -256,8 +253,9 @@ export function BudgetView() {
   );
   const missingAll = deptSummaries.reduce((s, d) => s + d.missing, 0);
 
-  const activeDept =
-    DEPARTMENTS.find((d) => d.id === selectedDeptId) ?? DEPARTMENTS[0];
+  const activeDept = departments.find((d) => d.id === selectedDeptId) ?? departments[0] ?? {
+    id: "", name: "Belum ada departemen", code: "-",
+  };
   const activeRows = useMemo(
     () => allRows.filter((r) => r.account.deptId === activeDept.id),
     [allRows, activeDept.id],
@@ -277,7 +275,7 @@ export function BudgetView() {
 
   const logs = useMemo(() => {
     const ids = new Set(activeRows.map((r) => r.account.id));
-    return DRAF_LOGS.filter(
+    return drafLogs.filter(
       (l) => ids.has(l.accountId) && l.year === year && l.month === month,
     );
   }, [activeRows, year, month]);
@@ -290,7 +288,7 @@ export function BudgetView() {
     // placeholder - could store current value if needed
   };
 
-  const handleSaveEdit = (accountId: string, value: number): string | null => {
+  const handleSaveEdit = async (accountId: string, value: number): Promise<string | null> => {
     const row = allRows.find((r) => r.account.id === accountId);
     if (!row) return "Account tidak ditemukan";
 
@@ -298,6 +296,9 @@ export function BudgetView() {
     if (value < floor) {
       return `Budget tidak boleh di bawah dana ditahan + realisasi (${formatRupiah(floor)}).`;
     }
+
+    const result = await updateMonthlyBudgetAction({ accountId, year, month, amount: value });
+    if (result.error) return result.error;
 
     const k = budgetKey(accountId, year, month);
     setBudgets((prev) => ({
@@ -338,7 +339,7 @@ export function BudgetView() {
   /* ---------- Actions: create budget ---------- */
   const deptsWithMissing = useMemo(
     () =>
-      DEPARTMENTS.filter((d) =>
+      departments.filter((d) =>
         allRows.some((r) => r.account.deptId === d.id && !r.hasBudget),
       ),
     [allRows],
@@ -360,11 +361,14 @@ export function BudgetView() {
     setCreateOpen(true);
   };
 
-  const saveCreate = (deptId: string, accountId: string, amount: number) => {
+  const saveCreate = async (deptId: string, accountId: string, amount: number) => {
     const row = allRows.find((r) => r.account.id === accountId);
     if (!row) return setCError("Pilih account terlebih dahulu.");
     if (row.hasBudget)
       return setCError("Account ini sudah punya budget bulan ini. Gunakan tombol ubah.");
+
+    const result = await createMonthlyBudgetAction({ accountId, year, month, amount });
+    if (result.error) return setCError(result.error);
 
     setBudgets((prev) => ({
       ...prev,
@@ -394,14 +398,14 @@ export function BudgetView() {
             </p>
           </div>
 
-          <Button
+          {canManage && <Button
             onClick={openAnnualImport}
             variant="outline"
             className="w-full justify-center gap-1.5 text-xs font-semibold h-9 border-blue-200 text-blue-700 hover:bg-blue-50"
           >
             <UploadSimpleIcon className="size-3.5" />
             Import anggaran 1 tahun
-          </Button>
+          </Button>}
 
           <BudgetPeriodFilter
             month={month}
@@ -410,7 +414,7 @@ export function BudgetView() {
             onMonthChange={(m) => { setMonth(m); resetInteraction(); }}
             onYearChange={(y) => { setYear(y); resetInteraction(); }}
             onDeptSearchChange={setDeptSearch}
-            totalDepartments={DEPARTMENTS.length}
+            totalDepartments={departments.length}
             missingCount={missingAll}
           />
         </div>
@@ -554,6 +558,7 @@ export function BudgetView() {
                 onImport={openTableImport}
                 onCreate={openCreate}
                 createDisabled={addDisabled}
+                canManage={canManage}
               />
             </div>
 
@@ -570,6 +575,7 @@ export function BudgetView() {
 
             <AccountBudgetTable
               rows={visibleRows}
+              canEdit={canManage}
               onEdit={handleEditStart}
               onSave={handleSaveEdit}
               onCancel={resetInteraction}
@@ -607,7 +613,7 @@ export function BudgetView() {
                 </thead>
                 <tbody className="divide-y divide-border/60">
                   {logs.map((l) => {
-                    const acc = ACCOUNTS.find((a) => a.id === l.accountId);
+                    const acc = accounts.find((a) => a.id === l.accountId);
                     return (
                       <tr key={l.id} className="hover:bg-muted/30 transition-colors">
                         <td className="p-3 whitespace-nowrap text-muted-foreground">{l.createdAt}</td>

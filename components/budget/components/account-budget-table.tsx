@@ -11,13 +11,15 @@ import { formatRupiah } from "@/lib/utils";
 
 export type AccountBudgetTableProps = {
   rows: BudgetRow[];
+  canEdit: boolean;
   onEdit: (accountId: string, currentValue: number | null) => void;
-  onSave: (accountId: string, value: number) => string | null;
+  onSave: (accountId: string, value: number) => string | null | Promise<string | null>;
   onCancel: () => void;
 };
 
 export function AccountBudgetTable({
   rows,
+  canEdit,
   onEdit,
   onSave,
   onCancel,
@@ -33,9 +35,9 @@ export function AccountBudgetTable({
     onEdit(r.account.id, r.hasBudget ? r.amount : null);
   };
 
-  const saveEdit = (r: BudgetRow) => {
+  const saveEdit = async (r: BudgetRow) => {
     const value = Number(editValue);
-    const err = onSave(r.account.id, value);
+    const err = await onSave(r.account.id, value);
     if (err) {
       setError(err);
     } else {
@@ -74,7 +76,7 @@ export function AccountBudgetTable({
                   <td className="p-3 font-semibold text-foreground">{r.account.name}</td>
 
                   <td className="p-3 text-right font-mono">
-                    {isEditing ? (
+                    {isEditing && canEdit ? (
                       <span className="inline-flex items-center justify-end gap-1.5">
                         <Input
                           autoFocus
@@ -111,7 +113,7 @@ export function AccountBudgetTable({
                             Belum diatur
                           </Badge>
                         )}
-                        <Button
+                        {canEdit && <Button
                           size="sm"
                           variant="outline"
                           className="h-6 px-2 text-[11px]"
@@ -119,7 +121,7 @@ export function AccountBudgetTable({
                           aria-label={`${r.hasBudget ? "Ubah" : "Atur"} budget ${r.account.name}`}
                         >
                           {r.hasBudget ? <PencilSimpleIcon className="size-3" /> : "Atur"}
-                        </Button>
+                        </Button>}
                       </span>
                     )}
                   </td>
@@ -140,7 +142,7 @@ export function AccountBudgetTable({
                   </td>
                 </tr>
 
-                {isEditing && (
+                {isEditing && canEdit && (
                   <tr key={`${r.account.id}-hint`} className="bg-primary/5">
                     <td colSpan={5} className="px-3 pb-3 pt-0 text-[11px] text-muted-foreground">
                       Batas minimal {formatRupiah(r.draf + r.realized)} (dana ditahan + realisasi).

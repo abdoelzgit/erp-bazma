@@ -23,12 +23,12 @@ import {
 import { parseBudgetExcel } from "../budget-import.parser";
 import type { BudgetImportPreview, BudgetImportScope } from "../budget-import.types";
 import { cn } from "@/lib/utils";
-import { MONTHS } from "../budget-view.data";
+import { MONTHS } from "../budget-view.constants";
 
 interface BudgetImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImportComplete: (data: BudgetImportPreview) => void;
+  onImportComplete: (data: BudgetImportPreview) => void | Promise<void>;
   scope: BudgetImportScope;
 }
 
@@ -61,9 +61,9 @@ export function BudgetImportDialog({
     }
   };
 
-  const handleConfirmImport = () => {
+  const handleConfirmImport = async () => {
     if (!preview) return;
-    onImportComplete(preview);
+    await onImportComplete(preview);
     handleClose();
   };
 
@@ -79,8 +79,10 @@ export function BudgetImportDialog({
   const importableRows = preview?.rows.filter((row) => row.status === "unmapped" || row.status === "new") ?? [];
   const outOfScopeCount = importableRows.filter((row) => {
     if (scope.type === "annual") return row.year !== scope.year;
-    return row.year !== scope.year || row.month !== scope.month ||
-      row.departmentName.trim().toLowerCase() !== scope.departmentName.trim().toLowerCase();
+    const departmentMatches = row.departmentCode
+      ? row.departmentCode.trim().toLowerCase() === scope.departmentCode.trim().toLowerCase()
+      : row.departmentName.trim().toLowerCase() === scope.departmentName.trim().toLowerCase();
+    return row.year !== scope.year || row.month !== scope.month || !departmentMatches;
   }).length;
   const inScopeCount = importableRows.length - outOfScopeCount;
 

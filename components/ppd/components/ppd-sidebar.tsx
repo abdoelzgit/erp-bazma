@@ -72,10 +72,8 @@ export function PpdSidebar({
             className="bg-transparent border rounded px-2 py-1 text-xs text-foreground cursor-pointer focus:outline-none"
           >
             <option value="All">All drafts</option>
-            <option value="Product updates">Product updates</option>
-            <option value="Guides">Guides</option>
-            <option value="Company news">Company news</option>
-            <option value="Uncategorized">Uncategorized</option>
+            <option value="Draft">Draft</option>
+            <option value="Submitted">Submitted</option>
           </select>
 
           <button

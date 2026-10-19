@@ -14,6 +14,14 @@ export type AuthActionResponse = {
   error?: string;
 };
 
+function getSafeRedirectTarget(value: FormDataEntryValue | null): string {
+  const target = value?.toString() ?? "";
+  if (!target.startsWith("/dashboard") || target.startsWith("//") || target.includes("\\")) {
+    return "/dashboard";
+  }
+  return target;
+}
+
 /**
  * Server Action untuk Login Pengguna
  */
@@ -23,6 +31,7 @@ export async function loginAction(
 ): Promise<AuthActionResponse> {
   const email = formData.get("email")?.toString().trim();
   const password = formData.get("password")?.toString();
+  const redirectTarget = getSafeRedirectTarget(formData.get("callbackUrl"));
 
   if (!email || !password) {
     return { error: "Email dan password wajib diisi." };
@@ -64,7 +73,7 @@ export async function loginAction(
   }
 
   // Redirect ke dashboard setelah login sukses
-  redirect("/dashboard");
+  redirect(redirectTarget);
 }
 
 /**

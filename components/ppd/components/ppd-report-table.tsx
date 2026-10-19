@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/select";
 import { formatRupiah } from "@/lib/utils";
 import type { ReportRow } from "../ppd.types";
-import { INITIAL_BUDGETS } from "../ppd.data";
 
 export type PpdReportTableProps = {
   rows: ReportRow[];
@@ -21,6 +20,9 @@ export type PpdReportTableProps = {
   onRemove: (id: string) => void;
   total: number;
   deptName: string;
+  year: number;
+  month: number;
+  budgets: Record<string, { amount: number; realized: number }>;
   accounts: Array<{ id: string; deptId: string; code: string; name: string }>;
 };
 
@@ -31,6 +33,9 @@ export function PpdReportTable({
   onRemove,
   total,
   deptName,
+  year,
+  month,
+  budgets,
   accounts,
 }: PpdReportTableProps) {
   if (!deptName) {
@@ -84,20 +89,19 @@ export function PpdReportTable({
             </thead>
             <tbody className="divide-y divide-border/60">
               {rows.map((row) => {
-                const account = accounts.find((acc) => acc.name === row.accountName);
-                const budgetKey = account ? `${account.id}|2026|10` : null;
-                const budget = budgetKey ? INITIAL_BUDGETS[budgetKey] : null;
+                const account = accounts.find((acc) => acc.id === row.accountId);
+                const budget = account ? budgets[`${account.id}|${year}|${month}`] : null;
                 const sisa = budget ? budget.amount - budget.realized : 0;
                 return (
                   <tr key={row.id} className="hover:bg-muted/30 transition-colors">
                     <td className="p-2.5">
-                      <Select value={row.accountName || ""} onValueChange={(v) => onUpdate(row.id, "accountName", v)}>
+                      <Select value={row.accountId || ""} onValueChange={(v) => onUpdate(row.id, "accountId", v)}>
                         <SelectTrigger className="h-8 text-xs bg-background">
                           <SelectValue placeholder="Pilih jenis pengajuan" />
                         </SelectTrigger>
                         <SelectContent>
                           {accounts.map((acc) => {
-                            const b = INITIAL_BUDGETS[`${acc.id}|2026|10`];
+                            const b = budgets[`${acc.id}|${year}|${month}`];
                             return (
                               <SelectItem key={acc.id} value={acc.name}>
                                 <div className="flex flex-col">
