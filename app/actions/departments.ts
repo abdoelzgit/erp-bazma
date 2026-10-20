@@ -13,11 +13,10 @@ type DepartmentInput = {
   pic: string;
   description: string;
   status: "Aktif" | "Nonaktif";
-  totalBudget: number;
   year: number;
 };
 
-type DepartmentUpdateInput = Omit<DepartmentInput, "totalBudget"> & { id: string };
+type DepartmentUpdateInput = DepartmentInput & { id: string };
 
 const canManageDepartments = async () => {
   const session = await getCurrentUser();
@@ -31,14 +30,22 @@ const toStatus = (status: DepartmentInput["status"]) => status === "Aktif" ? "AC
 const loadDepartment = async (id: string, year: number): Promise<Department | undefined> =>
   (await getDepartmentsForView(year)).find((department) => department.id === id);
 
+export async function getDepartmentsByBudgetYearAction(year: number) {
+  if (!Number.isInteger(year) || year < 1900 || year > 2100) return { error: "Tahun anggaran tidak valid." };
+  try {
+    return { data: await getDepartmentsForView(year) };
+  } catch (error) {
+    console.error("Load departments by budget year error:", error);
+    return { error: "Gagal memuat anggaran departemen." };
+  }
+}
+
 export async function createDepartmentAction(input: DepartmentInput) {
   if (!(await canManageDepartments())) return { error: "Hanya Admin yang dapat mengelola departemen." };
 
   const name = input.name.trim();
   const code = input.code.trim().toUpperCase();
-  const amount = Number(input.totalBudget);
   if (!name || !code) return { error: "Nama dan kode departemen wajib diisi." };
-  if (!Number.isFinite(amount) || amount < 0) return { error: "Anggaran tahunan tidak valid." };
 
   try {
     const department = await prisma.department.create({
@@ -48,7 +55,6 @@ export async function createDepartmentAction(input: DepartmentInput) {
         status: toStatus(input.status),
         picName: input.pic.trim() || null,
         description: input.description.trim() || null,
-        annualBudgets: { create: { year: input.year, allocatedAmount: amount } },
       },
     });
     const data = await loadDepartment(department.id, input.year);
@@ -149,62 +155,74 @@ export async function archiveDepartmentAction(id: string) {
   }
 }
 
-export async function updateDepartmentAnnualBudgetAction(input: {
-  departmentId: string;
-  year: number;
-  amount: number;
-}) {
-  const session = await getCurrentUser();
-  const user = session
-    ? await prisma.user.findUnique({ where: { id: session.id }, select: { role: true } })
-    : null;
-  if (!user || ![Role.ADMIN, Role.FINANCE].includes(user.role as Role)) {
-    return { error: "Hanya Admin atau Keuangan yang dapat mengatur pagu tahunan." };
-  }
-  if (!input.departmentId || !Number.isInteger(input.year) || !Number.isFinite(input.amount) || input.amount < 0) {
-    return { error: "Data pagu tahunan tidak valid." };
-  }
+export async function deleteDepartmentAction(id: string) {
+  if (!(await canManageDepartments())) return { error: "Hanya Admin yang dapat menghapus departemen." };
+  if (typeof id !== "string" || !id.trim()) return { error: "Departemen tidak valid." };
 
   try {
-    const realized = await prisma.monthlyBudget.aggregate({
-      where: { year: input.year, account: { departmentId: input.departmentId } },
-      _sum: { realizedAmount: true },
-    });
-    const minimum = Number(realized._sum.realizedAmount ?? 0);
-    if (input.amount < minimum) {
-      return { error: `Pagu tidak boleh di bawah realisasi ${new Intl.NumberFormat("id-ID").format(minimum)}.` };
-    }
+    const result = await prisma.$transaction(async (tx) => {
+      const department = await tx.department.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          _count: { select: { accounts: true, ppdRequests: true } },
+        },
+      });
+      if (!department) return { error: "Departemen tidak ditemukan." } as const;
 
-    await prisma.departmentAnnualBudget.upsert({
-      where: { departmentId_year: { departmentId: input.departmentId, year: input.year } },
-      update: { allocatedAmount: input.amount },
-      create: { departmentId: input.departmentId, year: input.year, allocatedAmount: input.amount },
+      if (department._count.accounts > 0 || department._count.ppdRequests > 0) {
+        return { error: "Departemen masih memiliki account budget atau riwayat PPD. Nonaktifkan departemen agar riwayat tetap tersimpan." } as const;
+      }
+
+      if (department.status === "ACTIVE") {
+        const activeCount = await tx.department.count({ where: { status: "ACTIVE" } });
+        if (activeCount <= 1) return { error: "Sistem harus memiliki minimal satu departemen aktif." } as const;
+      }
+
+      await tx.department.delete({ where: { id } });
+      return { id: department.id, name: department.name } as const;
     });
+
+    if ("error" in result) return { error: result.error };
     revalidatePath("/dashboard/department");
     revalidatePath("/dashboard/budget");
-    return { success: true };
+    revalidatePath("/dashboard/ppd");
+    return { success: true, ...result };
   } catch (error) {
-    console.error("Update annual department budget error:", error);
-    return { error: "Gagal memperbarui pagu tahunan." };
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2003") {
+      return { error: "Departemen masih memiliki data terkait dan tidak dapat dihapus." };
+    }
+    console.error("Delete department error:", error);
+    return { error: "Gagal menghapus departemen." };
   }
 }
 
 export async function addDepartmentMemberAction(input: {
   departmentId: string;
-  name: string;
-  email: string;
-  role: "Penanggung jawab" | "Anggota";
+  userId: string;
   year: number;
 }) {
   if (!(await canManageDepartments())) return { error: "Hanya Admin yang dapat mengelola anggota." };
-  const name = input.name.trim();
-  const email = input.email.trim().toLowerCase();
-  if (!input.departmentId || !name || !email) return { error: "Nama dan email anggota wajib diisi." };
+  if (!input.departmentId || !input.userId || !Number.isInteger(input.year) || input.year < 1900 || input.year > 2100) {
+    return { error: "Departemen, pengguna, atau tahun tidak valid." };
+  }
 
   try {
-    const existingUser = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-    const member = await prisma.$transaction(async (tx) => {
-      if (input.role === "Penanggung jawab") {
+    const { member, userRole } = await prisma.$transaction(async (tx) => {
+      const [department, user] = await Promise.all([
+        tx.department.findUnique({ where: { id: input.departmentId }, select: { status: true } }),
+        tx.user.findUnique({ where: { id: input.userId }, select: { id: true, name: true, email: true, role: true } }),
+      ]);
+      if (!department || department.status !== "ACTIVE") throw new Error("Departemen tidak aktif atau tidak ditemukan.");
+      if (!user) throw new Error("Pengguna tidak ditemukan.");
+
+      const departmentRole = user.role === Role.DEPT_HEAD ? "PIC" : "MEMBER";
+      const name = user.name?.trim() || user.email;
+      const email = user.email.toLowerCase();
+
+      if (departmentRole === "PIC") {
         await tx.departmentMember.updateMany({
           where: { departmentId: input.departmentId, role: "PIC" },
           data: { role: "MEMBER" },
@@ -213,22 +231,24 @@ export async function addDepartmentMemberAction(input: {
       const created = await tx.departmentMember.create({
         data: {
           departmentId: input.departmentId,
-          userId: existingUser?.id,
+          userId: user.id,
           name,
           email,
-          role: input.role === "Penanggung jawab" ? "PIC" : "MEMBER",
+          role: departmentRole,
         },
       });
-      if (input.role === "Penanggung jawab") {
+      if (departmentRole === "PIC") {
         await tx.department.update({ where: { id: input.departmentId }, data: { picName: name } });
       }
-      return created;
+      return { member: created, userRole: user.role };
     });
 
     const data: Member = {
       id: member.id,
+      userId: member.userId,
       name: member.name,
       email: member.email,
+      userRole,
       role: member.role === "PIC" ? "Penanggung jawab" : "Anggota",
       status: member.status === "ACTIVE" ? "Aktif" : "Nonaktif",
     };
@@ -236,10 +256,13 @@ export async function addDepartmentMemberAction(input: {
     return { success: true, data };
   } catch (error) {
     if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
-      return { error: "Anggota dengan email tersebut sudah terdaftar di departemen ini." };
+      return { error: "Pengguna tersebut sudah terdaftar di departemen ini." };
     }
     console.error("Add department member error:", error);
-    return { error: "Gagal menambahkan anggota." };
+    const message = error instanceof Error && (error.message === "Pengguna tidak ditemukan." || error.message.startsWith("Departemen"))
+      ? error.message
+      : "Gagal menambahkan anggota.";
+    return { error: message };
   }
 }
 

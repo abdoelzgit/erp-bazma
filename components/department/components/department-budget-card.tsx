@@ -1,36 +1,24 @@
 "use client";
 
 import { formatRupiah } from "@/lib/utils";
-import { SlidersHorizontalIcon } from "@phosphor-icons/react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { Department } from "../department-view.types";
 
 export type DepartmentBudgetCardProps = {
   dept: Department;
-  onAdjustBudget: () => void;
 };
 
-export function DepartmentBudgetCard({ dept, onAdjustBudget }: DepartmentBudgetCardProps) {
+export function DepartmentBudgetCard({ dept }: DepartmentBudgetCardProps) {
   const totalBudget = dept.totalBudget;
   const usedBudget = dept.usedBudget;
   const remainingBudget = Math.max(0, totalBudget - usedBudget);
   const budgetPercentage = totalBudget > 0 ? Math.min(100, Math.round((usedBudget / totalBudget) * 100)) : 0;
-  const quarterlyBudget = totalBudget > 0 ? Math.round(totalBudget / 4) : 0;
 
   return (
     <div className="rounded-lg border bg-card p-5 space-y-5 shadow-xs">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-sm">Anggaran departemen</h2>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs font-normal">
-            Tahun {dept.year}
-          </Badge>
-          <Button variant="outline" size="sm" onClick={onAdjustBudget} className="gap-1.5 text-xs h-7">
-            <SlidersHorizontalIcon className="size-3.5" />
-            Atur anggaran
-          </Button>
-        </div>
+        <Badge variant="outline" className="text-xs font-normal">Tahun {dept.year}</Badge>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -67,7 +55,7 @@ export function DepartmentBudgetCard({ dept, onAdjustBudget }: DepartmentBudgetC
       </div>
 
       <div className="text-[11px] text-muted-foreground border-t pt-3">
-        Alokasi triwulan: Q1 {formatRupiah(quarterlyBudget)} · Q2 {formatRupiah(quarterlyBudget)} · Q3 {formatRupiah(quarterlyBudget)} · Q4 {formatRupiah(quarterlyBudget)}
+        Total ini dihitung dari akumulasi budget bulanan semua account pada halaman Budget.
       </div>
     </div>
   );

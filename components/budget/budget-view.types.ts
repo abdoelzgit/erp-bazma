@@ -9,6 +9,7 @@ export type Account = {
   deptId: string; 
   code: string; 
   name: string; 
+  isActive: boolean;
 };
 
 export type BudgetEntry = { 

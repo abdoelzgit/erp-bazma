@@ -1,32 +1,42 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
+import { getPpdDepartmentAccessWhere } from "@/lib/ppd-access";
 import type { PpdPageData } from "@/components/ppd/ppd.types";
 
 const budgetKey = (accountId: string, year: number, month: number) => `${accountId}|${year}|${month}`;
 
 export async function getPpdPageData(): Promise<PpdPageData> {
   const session = await getCurrentUser();
-  const [requests, departments, accountRecords, budgets] = await Promise.all([
-    session
+  const accessWhere = session ? await getPpdDepartmentAccessWhere(session.id) : null;
+  const departments = accessWhere
+    ? await prisma.department.findMany({
+        where: accessWhere,
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      })
+    : [];
+  const departmentIds = departments.map((department) => department.id);
+  const [requests, accountRecords, budgets] = await Promise.all([
+    session && departmentIds.length
       ? prisma.pPDRequest.findMany({
-          where: { requestedById: session.id },
+          where: { requestedById: session.id, departmentId: { in: departmentIds } },
           include: { items: { include: { account: { select: { id: true, name: true } } } } },
           orderBy: { updatedAt: "desc" },
         })
       : Promise.resolve([]),
-    prisma.department.findMany({
-      where: { status: "ACTIVE" },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.budgetAccount.findMany({
-      where: { isActive: true, department: { status: "ACTIVE" } },
-      select: { id: true, departmentId: true, code: true, name: true },
-      orderBy: [{ department: { name: "asc" } }, { code: "asc" }],
-    }),
-    prisma.monthlyBudget.findMany({
-      select: { accountId: true, year: true, month: true, amount: true, realizedAmount: true },
-    }),
+    departmentIds.length
+      ? prisma.budgetAccount.findMany({
+          where: { isActive: true, departmentId: { in: departmentIds } },
+          select: { id: true, departmentId: true, code: true, name: true },
+          orderBy: [{ department: { name: "asc" } }, { code: "asc" }],
+        })
+      : Promise.resolve([]),
+    departmentIds.length
+      ? prisma.monthlyBudget.findMany({
+          where: { account: { departmentId: { in: departmentIds } } },
+          select: { accountId: true, year: true, month: true, amount: true, realizedAmount: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   return {

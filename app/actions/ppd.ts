@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { PPDType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
+import { canUserCreatePpdInDepartment } from "@/lib/ppd-access";
 
 type PpdDraftInput = {
   id?: string;
@@ -51,6 +52,9 @@ export async function savePpdDraftAction(input: PpdDraftInput) {
   const userId = await getUserId();
   if (!userId) return { error: "Sesi pengguna tidak ditemukan. Silakan masuk kembali." };
   if (!isValidInput(input)) return { error: "Data draft PPD tidak valid." };
+  if (!(await canUserCreatePpdInDepartment(userId, input.departmentId))) {
+    return { error: "Anda tidak memiliki akses membuat PPD di departemen tersebut." };
+  }
 
   try {
     const department = await prisma.department.findFirst({
@@ -138,9 +142,13 @@ export async function submitPpdDraftAction(id: string) {
   const userId = await getUserId();
   if (!userId) return { error: "Sesi pengguna tidak ditemukan. Silakan masuk kembali." };
   const request = await prisma.pPDRequest.findFirst({
-    where: { id, requestedById: userId, status: "DRAFT" }, include: { items: true },
+    where: { id, requestedById: userId, status: "DRAFT" },
+    include: { items: true, department: { select: { id: true } } },
   });
   if (!request) return { error: "Draft tidak ditemukan atau sudah dikirim." };
+  if (!(await canUserCreatePpdInDepartment(userId, request.department.id))) {
+    return { error: "Anda tidak lagi memiliki akses membuat PPD di departemen tersebut." };
+  }
   if (!request.title.trim() || request.items.length === 0 || request.items.some((item) => !item.accountId)) {
     return { error: "Lengkapi judul dan account pada minimal satu item sebelum mengirim." };
   }

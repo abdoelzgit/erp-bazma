@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { PencilSimpleIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import { PencilSimpleIcon, WarningCircleIcon, TrashIcon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ export type AccountBudgetTableProps = {
   onEdit: (accountId: string, currentValue: number | null) => void;
   onSave: (accountId: string, value: number) => string | null | Promise<string | null>;
   onCancel: () => void;
+  onRemove: (accountId: string) => void | Promise<void>;
 };
 
 export function AccountBudgetTable({
@@ -23,6 +24,7 @@ export function AccountBudgetTable({
   onEdit,
   onSave,
   onCancel,
+  onRemove,
 }: AccountBudgetTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -62,6 +64,7 @@ export function AccountBudgetTable({
             <th className="p-3 text-right font-medium">Budget</th>
             <th className="p-3 text-right font-medium">Realisasi</th>
             <th className="p-3 text-right font-medium">Saldo</th>
+            {canEdit && <th className="p-3 text-right font-medium">Aksi</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-border/60">
@@ -82,7 +85,7 @@ export function AccountBudgetTable({
                           autoFocus
                           type="number"
                           min={0}
-                          step={500000}
+                          step={1}
                           value={editValue}
                           onChange={(e) => { setEditValue(e.target.value); setError(null); }}
                           onKeyDown={(e) => {
@@ -140,11 +143,26 @@ export function AccountBudgetTable({
                       </div>
                     )}
                   </td>
+
+                  {canEdit && (
+                    <td className="p-3 text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-destructive hover:text-destructive"
+                        onClick={() => onRemove(r.account.id)}
+                        aria-label={`Hapus atau nonaktifkan akun ${r.account.name}`}
+                      >
+                        <TrashIcon className="size-3.5" />
+                        <span className="sr-only">Hapus/nonaktifkan</span>
+                      </Button>
+                    </td>
+                  )}
                 </tr>
 
                 {isEditing && canEdit && (
                   <tr key={`${r.account.id}-hint`} className="bg-primary/5">
-                    <td colSpan={5} className="px-3 pb-3 pt-0 text-[11px] text-muted-foreground">
+                    <td colSpan={canEdit ? 6 : 5} className="px-3 pb-3 pt-0 text-[11px] text-muted-foreground">
                       Batas minimal {formatRupiah(r.draf + r.realized)} (dana ditahan + realisasi).
                       {error && (
                         <span className="ml-2 inline-flex items-center gap-1 text-destructive">
@@ -161,7 +179,7 @@ export function AccountBudgetTable({
 
           {rows.length === 0 && (
             <tr>
-              <td colSpan={5} className="p-8 text-center text-muted-foreground">
+              <td colSpan={canEdit ? 6 : 5} className="p-8 text-center text-muted-foreground">
                 Tidak ada account yang sesuai pencarian.
               </td>
             </tr>

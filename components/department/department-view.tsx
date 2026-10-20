@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { CheckCircleIcon, PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
-import type { Department } from "./department-view.types";
+import type { Department, DepartmentUserOption } from "./department-view.types";
 import { DepartmentSidebar } from "./components/department-sidebar";
 import { DepartmentInfoCard } from "./components/department-info-card";
 import { DepartmentBudgetCard } from "./components/department-budget-card";
@@ -13,12 +13,17 @@ import {
   addDepartmentMemberAction,
   archiveDepartmentAction,
   createDepartmentAction,
+  deleteDepartmentAction,
+  getDepartmentsByBudgetYearAction,
   removeDepartmentMemberAction,
   updateDepartmentAction,
-  updateDepartmentAnnualBudgetAction,
 } from "@/app/actions/departments";
 
-export function DepartmentView({ initialDepartments }: { initialDepartments: Department[] }) {
+export function DepartmentView({ initialDepartments, userOptions, canManageMembers }: {
+  initialDepartments: Department[];
+  userOptions: DepartmentUserOption[];
+  canManageMembers: boolean;
+}) {
   const [departments, setDepartments] = useState<Department[]>(initialDepartments);
   const [selectedDeptId, setSelectedDeptId] = useState<string>(initialDepartments[0]?.id ?? "");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -32,7 +37,6 @@ export function DepartmentView({ initialDepartments }: { initialDepartments: Dep
   const [isAddDeptOpen, setIsAddDeptOpen] = useState(false);
   const [isEditDeptOpen, setIsEditDeptOpen] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
-  const [isAdjustBudgetOpen, setIsAdjustBudgetOpen] = useState(false);
 
   // Forms
   const [deptForm, setDeptForm] = useState({
@@ -40,21 +44,21 @@ export function DepartmentView({ initialDepartments }: { initialDepartments: Dep
     code: "",
     pic: "",
     description: "",
-    totalBudget: 100000000,
     status: "Aktif" as "Aktif" | "Nonaktif",
   });
 
-  const [memberForm, setMemberForm] = useState({
-    name: "",
-    email: "",
-    role: "Anggota" as "Penanggung jawab" | "Anggota",
-  });
-
-  const [budgetForm, setBudgetForm] = useState(0);
+  const [memberForm, setMemberForm] = useState({ userId: "" });
 
   const activeDept = useMemo(() => {
     return departments.find((d) => d.id === selectedDeptId) || departments[0];
   }, [departments, selectedDeptId]);
+
+  const availableMemberUsers = useMemo(
+    () => userOptions.filter((user) => !activeDept?.members.some(
+      (member) => member.userId === user.id || member.email.toLowerCase() === user.email.toLowerCase(),
+    )),
+    [activeDept, userOptions],
+  );
 
   const summaryMetrics = useMemo(() => {
     const totalCount = departments.length;
@@ -80,13 +84,23 @@ export function DepartmentView({ initialDepartments }: { initialDepartments: Dep
     setTimeout(() => setFeedback(null), 3000);
   };
 
+  const handleYearChange = async (value: string) => {
+    setYearFilter(value);
+    const year = value === "Semua" ? new Date().getFullYear() : Number(value);
+    const result = await getDepartmentsByBudgetYearAction(year);
+    if (result.error || !result.data) {
+      showFeedback(result.error ?? "Gagal memuat anggaran departemen.");
+      return;
+    }
+    setDepartments(result.data);
+  };
+
   const handleOpenAddDept = () => {
     setDeptForm({
       name: "",
       code: "DPT-",
       pic: "",
       description: "",
-      totalBudget: 150000000,
       status: "Aktif",
     });
     setIsAddDeptOpen(true);
@@ -114,7 +128,6 @@ export function DepartmentView({ initialDepartments }: { initialDepartments: Dep
       code: activeDept.code,
       pic: activeDept.pic,
       description: activeDept.description,
-      totalBudget: activeDept.totalBudget,
       status: activeDept.status,
     });
     setIsEditDeptOpen(true);
@@ -156,39 +169,28 @@ export function DepartmentView({ initialDepartments }: { initialDepartments: Dep
     }
   };
 
-  const handleOpenAdjustBudget = () => {
+  const handlePermanentDeleteDept = async () => {
     if (!activeDept) return;
-    setBudgetForm(activeDept.totalBudget);
-    setIsAdjustBudgetOpen(true);
-  };
+    if (!confirm(`Hapus permanen departemen ${activeDept.name}? Departemen hanya dapat dihapus jika belum memiliki account budget atau riwayat PPD.`)) return;
 
-  const handleSaveAdjustBudget = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeDept) return;
-    const result = await updateDepartmentAnnualBudgetAction({
-      departmentId: activeDept.id,
-      year: activeDept.year,
-      amount: Number(budgetForm),
-    });
+    const result = await deleteDepartmentAction(activeDept.id);
     if (result.error) {
       showFeedback(result.error);
       return;
     }
-    setDepartments((prev) => prev.map((department) => department.id === activeDept.id
-      ? { ...department, totalBudget: Number(budgetForm), updatedAt: "Hari ini" }
-      : department));
-    setIsAdjustBudgetOpen(false);
-    showFeedback("Anggaran departemen berhasil disesuaikan.");
+
+    const remainingDepartments = departments.filter((department) => department.id !== activeDept.id);
+    setDepartments(remainingDepartments);
+    setSelectedDeptId(remainingDepartments[0]?.id ?? "");
+    showFeedback(`Departemen ${activeDept.name} berhasil dihapus.`);
   };
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!memberForm.name || !memberForm.email || !activeDept) return;
+    if (!memberForm.userId || !activeDept) return;
     const result = await addDepartmentMemberAction({
       departmentId: activeDept.id,
-      name: memberForm.name,
-      email: memberForm.email,
-      role: memberForm.role,
+      userId: memberForm.userId,
       year: activeDept.year,
     });
     if (result.error || !result.data) {
@@ -196,23 +198,24 @@ export function DepartmentView({ initialDepartments }: { initialDepartments: Dep
       return;
     }
     const newMember = result.data;
+    const isPic = newMember.role === "Penanggung jawab";
     setDepartments((prev) =>
       prev.map((d) =>
         d.id === activeDept.id
           ? {
               ...d,
               members: [
-                ...d.members.map((member) => memberForm.role === "Penanggung jawab" && member.role === "Penanggung jawab"
+                ...d.members.map((member) => isPic && member.role === "Penanggung jawab"
                   ? { ...member, role: "Anggota" as const }
                   : member),
                 newMember,
               ],
-              pic: memberForm.role === "Penanggung jawab" ? newMember.name : d.pic,
+              pic: isPic ? newMember.name : d.pic,
             }
           : d
       )
     );
-    setMemberForm({ name: "", email: "", role: "Anggota" });
+    setMemberForm({ userId: "" });
     setIsAddMemberOpen(false);
     showFeedback(`${newMember.name} berhasil ditambahkan ke departemen.`);
   };
@@ -255,7 +258,7 @@ export function DepartmentView({ initialDepartments }: { initialDepartments: Dep
         status={statusFilter}
         onStatusChange={setStatusFilter}
         year={yearFilter}
-        onYearChange={setYearFilter}
+        onYearChange={handleYearChange}
       />
 
       <main className="flex-1 flex flex-col overflow-y-auto bg-background">
@@ -295,11 +298,14 @@ export function DepartmentView({ initialDepartments }: { initialDepartments: Dep
                     <PencilSimpleIcon className="size-3.5" />
                     Edit departemen
                   </button>
+               
                   <button
-                    onClick={handleDeleteDept}
-                    className="text-destructive hover:bg-destructive/10 border-destructive/30 text-xs h-8 px-3 rounded-md border inline-flex items-center"
+                    onClick={handlePermanentDeleteDept}
+                    aria-label={`Hapus permanen departemen ${activeDept.name}`}
+                    title="Hapus permanen departemen yang belum memiliki riwayat"
+                    className="text-destructive hover:bg-destructive/10 border-destructive/30 text-xs h-8 w-8 rounded-md border inline-flex items-center justify-center"
                   >
-                    Nonaktifkan
+                    <TrashIcon className="size-3.5" />
                   </button>
                 </div>
               </div>
@@ -317,14 +323,15 @@ export function DepartmentView({ initialDepartments }: { initialDepartments: Dep
             )}
 
             <DepartmentInfoCard dept={activeDept} />
-            <DepartmentBudgetCard dept={activeDept} onAdjustBudget={handleOpenAdjustBudget} />
+            <DepartmentBudgetCard dept={activeDept} />
             <DepartmentMembersCard
               dept={activeDept}
               memberSearch={memberSearch}
               onMemberSearchChange={setMemberSearch}
               memberRoleFilter={memberRoleFilter}
               onMemberRoleFilterChange={setMemberRoleFilter}
-              onAddMember={() => setIsAddMemberOpen(true)}
+              canManageMembers={canManageMembers}
+              onAddMember={() => { setMemberForm({ userId: "" }); setIsAddMemberOpen(true); }}
               onRemoveMember={handleRemoveMember}
             />
           </div>
@@ -344,18 +351,12 @@ export function DepartmentView({ initialDepartments }: { initialDepartments: Dep
         isEditOpen={isEditDeptOpen}
         onCloseEdit={() => setIsEditDeptOpen(false)}
         onSubmitEdit={handleSaveEditDept}
-        isBudgetOpen={isAdjustBudgetOpen}
-        onCloseBudget={() => setIsAdjustBudgetOpen(false)}
-        onSubmitBudget={handleSaveAdjustBudget}
-        budgetVal={budgetForm}
-        onBudgetValChange={setBudgetForm}
-        activeDeptName={activeDept?.name}
-        activeDeptYear={activeDept?.year}
         isMemberOpen={isAddMemberOpen}
         onCloseMember={() => setIsAddMemberOpen(false)}
         onSubmitMember={handleAddMember}
         memberForm={memberForm}
         onMemberFormChange={setMemberForm}
+        memberUsers={availableMemberUsers}
       />
     </div>
   );

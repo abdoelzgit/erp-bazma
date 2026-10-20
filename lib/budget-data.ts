@@ -18,7 +18,7 @@ export async function getBudgetPageData(): Promise<BudgetPageData> {
     }),
     prisma.budgetAccount.findMany({
       where: { department: { status: "ACTIVE" } },
-      select: { id: true, departmentId: true, code: true, name: true },
+      select: { id: true, departmentId: true, code: true, name: true, isActive: true },
       orderBy: [{ department: { name: "asc" } }, { code: "asc" }],
     }),
     prisma.monthlyBudget.findMany({
@@ -38,6 +38,7 @@ export async function getBudgetPageData(): Promise<BudgetPageData> {
       deptId: account.departmentId,
       code: account.code,
       name: account.name,
+      isActive: account.isActive,
     })),
     budgets: Object.fromEntries(
       budgetRecords.map((budget) => [

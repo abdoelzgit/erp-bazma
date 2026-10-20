@@ -12,8 +12,10 @@ const formatDate = (date: Date) =>
 export async function getDepartmentsForView(year: number): Promise<DepartmentViewModel[]> {
   const departments = await prisma.department.findMany({
     include: {
-      members: { orderBy: [{ role: "asc" }, { name: "asc" }] },
-      annualBudgets: { where: { year } },
+      members: {
+        include: { user: { select: { name: true, email: true, role: true } } },
+        orderBy: [{ role: "asc" }, { name: "asc" }],
+      },
       accounts: { include: { budgets: { where: { year } } } },
     },
     orderBy: [{ status: "asc" }, { name: "asc" }],
@@ -27,6 +29,10 @@ export async function getDepartmentsForView(year: number): Promise<DepartmentVie
       (sum, account) => sum + account.budgets.reduce((accountSum, budget) => accountSum + Number(budget.realizedAmount), 0),
       0,
     );
+    const totalBudget = department.accounts.reduce(
+      (sum, account) => sum + account.budgets.reduce((accountSum, budget) => accountSum + Number(budget.amount), 0),
+      0,
+    );
 
     return {
       id: department.id,
@@ -35,15 +41,17 @@ export async function getDepartmentsForView(year: number): Promise<DepartmentVie
       status: department.status === "ACTIVE" ? "Aktif" : "Nonaktif",
       pic,
       description: department.description ?? "",
-      totalBudget: Number(department.annualBudgets[0]?.allocatedAmount ?? 0),
+      totalBudget,
       usedBudget,
       year,
       updatedAt: formatDate(department.updatedAt),
       updatedBy: "Sistem",
       members: department.members.map((member) => ({
         id: member.id,
-        name: member.name,
-        email: member.email,
+        userId: member.userId,
+        name: member.user?.name ?? member.name,
+        email: member.user?.email ?? member.email,
+        userRole: member.user?.role ?? null,
         role: member.role === "PIC" ? "Penanggung jawab" as const : "Anggota" as const,
         status: member.status === "ACTIVE" ? "Aktif" as const : "Nonaktif" as const,
       })),

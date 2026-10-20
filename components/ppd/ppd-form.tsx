@@ -65,6 +65,7 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
     () => initialData.accounts.filter((account) => account.deptId === deptId),
     [initialData.accounts, deptId],
   );
+  const departmentName = initialData.departments.find((department) => department.id === deptId)?.name ?? "";
 
   const setFeedback = (message: string) => {
     setFeedbackMessage(message);
@@ -81,7 +82,24 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
   }]);
 
   const handleUpdateRow = (id: string, field: keyof ReportRow, value: string | number | null) => {
-    setRows((previous) => previous.map((row) => row.id === id ? { ...row, [field]: value } : row));
+    setRows((previous) => previous.map((row) => {
+      if (row.id !== id) return row;
+      if (field === "accountId") {
+        const accountName = initialData.accounts.find((account) => account.id === value)?.name ?? null;
+        return { ...row, accountId: typeof value === "string" ? value : null, accountName };
+      }
+      return { ...row, [field]: value };
+    }));
+  };
+
+  const handleDeptChange = (newDepartmentId: string) => {
+    setDeptId(newDepartmentId);
+    const allowedAccountIds = new Set(
+      initialData.accounts.filter((account) => account.deptId === newDepartmentId).map((account) => account.id),
+    );
+    setRows((previous) => previous.map((row) => row.accountId && !allowedAccountIds.has(row.accountId)
+      ? { ...row, accountId: null, accountName: null }
+      : row));
   };
 
   const handleRemoveRow = (id: string) => setRows((previous) => previous.filter((row) => row.id !== id));
@@ -136,6 +154,9 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
   };
 
   const handleCreateNewDraft = async () => {
+    if (initialData.departments.length === 0) {
+      return setFeedback("Anda belum memiliki akses ke departemen aktif untuk membuat PPD.");
+    }
     setIsSaving(true);
     const now = new Date();
     const result = await savePpdDraftAction({
@@ -219,7 +240,7 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
               <PpdFormDetails
                 title={formTitle} onTitleChange={setFormTitle}
                 description={formDescription} onDescriptionChange={setFormDescription}
-                deptId={deptId} onDeptIdChange={setDeptId} departments={initialData.departments}
+                deptId={deptId} onDeptIdChange={handleDeptChange} departments={initialData.departments}
                 submissionType={submissionType} onSubmissionTypeChange={setSubmissionType}
                 paymentType={paymentType} onPaymentTypeChange={setPaymentType}
                 bank={bank} onBankChange={setBank} accountNo={accountNo} onAccountNoChange={setAccountNo}
@@ -227,7 +248,7 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
               />
               <PpdReportTable
                 rows={rows} onAdd={handleAddRow} onUpdate={handleUpdateRow} onRemove={handleRemoveRow}
-                total={totalAmount} deptName={deptId} accounts={filteredAccounts}
+                total={totalAmount} deptName={departmentName} accounts={filteredAccounts}
                 budgets={initialData.budgets} year={year} month={month}
               />
               {activeDraft.status === "Draft" && <PpdActionBar

@@ -103,7 +103,7 @@ export function PpdReportTable({
                           {accounts.map((acc) => {
                             const b = budgets[`${acc.id}|${year}|${month}`];
                             return (
-                              <SelectItem key={acc.id} value={acc.name}>
+                              <SelectItem key={acc.id} value={acc.id}>
                                 <div className="flex flex-col">
                                   <span className="font-medium">{acc.name}</span>
                                   <span className="text-[10px] text-muted-foreground">

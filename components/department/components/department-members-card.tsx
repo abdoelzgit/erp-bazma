@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import type { Department, Member } from "../department-view.types";
+import { ROLE_LABELS } from "@/lib/roles";
 
 export type DepartmentMembersCardProps = {
   dept: Department;
@@ -12,6 +13,7 @@ export type DepartmentMembersCardProps = {
   onMemberSearchChange: (v: string) => void;
   memberRoleFilter: string;
   onMemberRoleFilterChange: (v: string) => void;
+  canManageMembers: boolean;
   onAddMember: () => void;
   onRemoveMember: (memberId: string, memberName: string) => void;
 };
@@ -22,6 +24,7 @@ export function DepartmentMembersCard({
   onMemberSearchChange,
   memberRoleFilter,
   onMemberRoleFilterChange,
+  canManageMembers,
   onAddMember,
   onRemoveMember,
 }: DepartmentMembersCardProps) {
@@ -44,10 +47,12 @@ export function DepartmentMembersCard({
           <Badge variant="outline" className="text-xs font-normal">
             {dept.members.length} anggota
           </Badge>
-          <Button variant="outline" size="sm" onClick={onAddMember} className="gap-1.5 text-xs h-7 font-medium">
-            <PlusIcon className="size-3.5" />
-            + Tambah anggota
-          </Button>
+          {canManageMembers && (
+            <Button variant="outline" size="sm" onClick={onAddMember} className="gap-1.5 text-xs h-7 font-medium">
+              <PlusIcon className="size-3.5" />
+              Tambah anggota
+            </Button>
+          )}
         </div>
       </div>
 
@@ -89,7 +94,12 @@ export function DepartmentMembersCard({
                   <div className="font-semibold text-foreground">{member.name}</div>
                   <div className="text-muted-foreground text-[11px]">{member.email}</div>
                 </td>
-                <td className="p-3 text-muted-foreground font-medium">{member.role}</td>
+                <td className="p-3">
+                  <div className="font-medium text-foreground">{member.role}</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Role akun: {member.userRole ? ROLE_LABELS[member.userRole] : "Belum terhubung"}
+                  </div>
+                </td>
                 <td className="p-3">
                   <span className="inline-flex items-center gap-1.5 text-foreground font-medium">
                     <span className="size-1.5 rounded-full bg-emerald-500" />

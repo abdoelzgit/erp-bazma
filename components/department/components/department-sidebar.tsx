@@ -43,7 +43,7 @@ export function DepartmentSidebar({
 
         <Button onClick={onAdd} variant="outline" className="w-full justify-center gap-1.5 text-xs font-semibold h-9">
           <PlusIcon className="size-3.5" />
-          + Tambah departemen
+           Tambah departemen
         </Button>
 
         <div className="space-y-1">

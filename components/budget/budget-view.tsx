@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { formatRupiah } from "@/lib/utils";
-import { createMonthlyBudgetAction, importMonthlyBudgetsAction, updateMonthlyBudgetAction } from "@/app/actions/budget";
+import { createBudgetAccountAndBudgetAction, importMonthlyBudgetsAction, removeBudgetAccountAction, updateMonthlyBudgetAction } from "@/app/actions/budget";
 import type { BudgetPageData } from "@/lib/budget-data";
 
 import * as XLSX from "xlsx";
@@ -51,7 +51,8 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
   const [deptSearch, setDeptSearch] = useState("");
   const [accSearch, setAccSearch] = useState("");
   const departments = initialData.departments;
-  const accounts = initialData.accounts;
+  const [accounts, setAccounts] = useState(initialData.accounts);
+  const activeAccounts = useMemo(() => accounts.filter((account) => account.isActive), [accounts]);
   const drafLogs = initialData.drafLogs;
   const [budgets, setBudgets] = useState(initialData.budgets);
 
@@ -61,6 +62,7 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
   const [createOpen, setCreateOpen] = useState(false);
   const [cDept, setCDept] = useState<string>("");
   const [cAccount, setCAccount] = useState<string>("");
+  const [cAccountCode, setCAccountCode] = useState<string>("");
   const [cAmount, setCAmount] = useState<string>("");
   const [cError, setCError] = useState<string | null>(null);
 
@@ -112,11 +114,11 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
       const department = departmentByCode
         ?? departments.find((item) => item.name.trim().toLowerCase() === String(row.departmentName).trim().toLowerCase());
       const accountByCode = row.accountCode
-        ? accounts.find((item) => item.code.trim().toLowerCase() === String(row.accountCode).trim().toLowerCase() && (!department || item.deptId === department.id))
+        ? activeAccounts.find((item) => item.code.trim().toLowerCase() === String(row.accountCode).trim().toLowerCase() && (!department || item.deptId === department.id))
         : undefined;
       if (row.accountCode && !accountByCode) return [];
       if (accountByCode && department && accountByCode.deptId !== department.id) return [];
-      const account = accountByCode ?? accounts.find((item) => item.deptId === department?.id && item.name.trim().toLowerCase() === String(row.accountName).trim().toLowerCase());
+      const account = accountByCode ?? activeAccounts.find((item) => item.deptId === department?.id && item.name.trim().toLowerCase() === String(row.accountName).trim().toLowerCase());
       return account ? [{ accountId: account.id, year: row.year, month: row.month, amount: row.amount }] : [];
     });
     const unmatched = validRows.length - mappedRows.length;
@@ -164,7 +166,7 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
     if (!dept) return showFeedback("Tidak ada departemen untuk diekspor.");
     const data: any[] = [];
 
-    accounts.filter((acc) => acc.deptId === selectedDeptId).forEach((acc) => {
+    activeAccounts.filter((acc) => acc.deptId === selectedDeptId).forEach((acc) => {
       const entry = budgets[budgetKey(acc.id, year, month)];
       if (entry) {
         data.push({
@@ -204,7 +206,7 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
   /* ---------- Data derived ---------- */
   const allRows: BudgetRow[] = useMemo(
     () =>
-      accounts.map((account) => {
+      activeAccounts.map((account) => {
         const entry = budgets[budgetKey(account.id, year, month)];
         const draf = drafLogs.filter(
           (l) => l.accountId === account.id && l.year === year && l.month === month,
@@ -220,7 +222,7 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
           saldo: amount - realized - draf,
         };
       }),
-    [budgets, year, month],
+    [activeAccounts, budgets, year, month],
   );
 
   const deptSummaries: DepartmentSummary[] = useMemo(
@@ -310,6 +312,26 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
     return null;
   };
 
+  const handleRemoveAccount = async (accountId: string) => {
+    const account = accounts.find((item) => item.id === accountId);
+    if (!account) return;
+    if (!confirm(`Hapus atau nonaktifkan akun ${account.code} · ${account.name}? Akun yang sudah memiliki riwayat akan dinonaktifkan agar data lama tetap tersimpan.`)) return;
+
+    const result = await removeBudgetAccountAction(accountId);
+    if (result.error) {
+      showFeedback(result.error);
+      return;
+    }
+
+    if (result.mode === "deactivated") {
+      setAccounts((previous) => previous.map((item) => item.id === accountId ? { ...item, isActive: false } : item));
+      showFeedback(`Akun ${account.name} dinonaktifkan. Riwayat anggaran tetap tersimpan.`);
+    } else {
+      setAccounts((previous) => previous.filter((item) => item.id !== accountId));
+      showFeedback(`Akun ${account.name} dihapus.`);
+    }
+  };
+
   /* ---------- Actions: copy previous month ---------- */
   const handleCopyPrevMonth = () => {
     const py = month === 1 ? year - 1 : year;
@@ -337,51 +359,48 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
   };
 
   /* ---------- Actions: create budget ---------- */
-  const deptsWithMissing = useMemo(
-    () =>
-      departments.filter((d) =>
-        allRows.some((r) => r.account.deptId === d.id && !r.hasBudget),
-      ),
-    [allRows],
-  );
-
-  const createChoices = useMemo(
-    () => allRows.filter((r) => r.account.deptId === cDept && !r.hasBudget),
-    [allRows, cDept],
-  );
-
   const openCreate = () => {
-    const preferred = deptsWithMissing.some((d) => d.id === activeDept.id)
-      ? activeDept.id
-      : deptsWithMissing[0]?.id ?? "";
-    setCDept(preferred);
+    if (!activeDept.id) {
+      showFeedback("Tambahkan departemen sebelum membuat account budget.");
+      return;
+    }
+    setCDept(activeDept.id);
     setCAccount("");
+    setCAccountCode("");
     setCAmount("");
     setCError(null);
     setCreateOpen(true);
   };
 
-  const saveCreate = async (deptId: string, accountId: string, amount: number) => {
-    const row = allRows.find((r) => r.account.id === accountId);
-    if (!row) return setCError("Pilih account terlebih dahulu.");
-    if (row.hasBudget)
-      return setCError("Account ini sudah punya budget bulan ini. Gunakan tombol ubah.");
-
-    const result = await createMonthlyBudgetAction({ accountId, year, month, amount });
+  const saveCreate = async (deptId: string, accountName: string, accountCode: string, amount: number) => {
+    const result = await createBudgetAccountAndBudgetAction({
+      departmentId: deptId,
+      name: accountName,
+      code: accountCode,
+      year,
+      month,
+      amount,
+    });
     if (result.error) return setCError(result.error);
+    if (!result.data) return setCError("Account gagal dibuat.");
 
     setBudgets((prev) => ({
       ...prev,
-      [budgetKey(accountId, year, month)]: { amount, realized: 0 },
+      [budgetKey(result.data.id, year, month)]: { amount, realized: 0 },
     }));
-    setSelectedDeptId(row.account.deptId);
+    setAccounts((previous) => [...previous, {
+      id: result.data!.id,
+      deptId: result.data!.departmentId,
+      code: result.data!.code,
+      name: result.data!.name,
+      isActive: result.data!.isActive,
+    }]);
+    setSelectedDeptId(deptId);
     setCreateOpen(false);
-    showFeedback(
-      `Budget ${row.account.name} (${MONTHS[month - 1]} ${year}) dibuat: ${formatRupiah(amount)}.`,
-    );
+    showFeedback(`Account ${result.data.name} dan budget ${MONTHS[month - 1]} ${year} berhasil dibuat.`);
   };
 
-  const addDisabled = deptsWithMissing.length === 0;
+  const addDisabled = !activeDept.id;
 
   /* ---------- Render ---------- */
   return (
@@ -579,6 +598,7 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
               onEdit={handleEditStart}
               onSave={handleSaveEdit}
               onCancel={resetInteraction}
+              onRemove={handleRemoveAccount}
             />
 
             <p className="text-[11px] text-muted-foreground">
@@ -659,14 +679,15 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
         onSubmit={saveCreate}
         month={month}
         year={year}
-        departmentsWithMissing={deptsWithMissing}
-        accountsWithoutBudget={createChoices}
+        departments={departments}
         selectedDeptId={cDept}
-        selectedAccountId={cAccount}
+        selectedAccountName={cAccount}
+        accountCode={cAccountCode}
         amount={cAmount}
         error={cError}
         onDeptChange={setCDept}
-        onAccountChange={setCAccount}
+        onAccountNameChange={setCAccount}
+        onAccountCodeChange={setCAccountCode}
         onAmountChange={setCAmount}
         onErrorChange={setCError}
       />

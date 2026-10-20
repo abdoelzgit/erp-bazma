@@ -4,6 +4,8 @@ import { XIcon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ROLE_LABELS } from "@/lib/roles";
+import type { DepartmentUserOption } from "../department-view.types";
 
 export type DepartmentDialogsProps = {
   // Add Dept
@@ -15,7 +17,6 @@ export type DepartmentDialogsProps = {
     code: string;
     pic: string;
     description: string;
-    totalBudget: number;
     status: "Aktif" | "Nonaktif";
   };
   onDeptFormChange: (form: any) => void;
@@ -25,25 +26,15 @@ export type DepartmentDialogsProps = {
   onCloseEdit: () => void;
   onSubmitEdit: (e: React.FormEvent) => void;
 
-  // Adjust Budget
-  isBudgetOpen: boolean;
-  onCloseBudget: () => void;
-  onSubmitBudget: (e: React.FormEvent) => void;
-  budgetVal: number;
-  onBudgetValChange: (v: number) => void;
-  activeDeptName?: string;
-  activeDeptYear?: number;
-
   // Add Member
   isMemberOpen: boolean;
   onCloseMember: () => void;
   onSubmitMember: (e: React.FormEvent) => void;
   memberForm: {
-    name: string;
-    email: string;
-    role: "Penanggung jawab" | "Anggota";
+    userId: string;
   };
   onMemberFormChange: (form: any) => void;
+  memberUsers: DepartmentUserOption[];
 };
 
 export function DepartmentDialogs({
@@ -55,18 +46,12 @@ export function DepartmentDialogs({
   isEditOpen,
   onCloseEdit,
   onSubmitEdit,
-  isBudgetOpen,
-  onCloseBudget,
-  onSubmitBudget,
-  budgetVal,
-  onBudgetValChange,
-  activeDeptName,
-  activeDeptYear,
   isMemberOpen,
   onCloseMember,
   onSubmitMember,
   memberForm,
   onMemberFormChange,
+  memberUsers,
 }: DepartmentDialogsProps) {
   return (
     <>
@@ -121,16 +106,6 @@ export function DepartmentDialogs({
                   value={deptForm.pic}
                   onChange={(e) => onDeptFormChange({ ...deptForm, pic: e.target.value })}
                   className="h-9 text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="font-medium text-muted-foreground">Alokasi Anggaran Tahunan (Rp)</label>
-                <Input
-                  type="number"
-                  placeholder="150000000"
-                  value={deptForm.totalBudget}
-                  onChange={(e) => onDeptFormChange({ ...deptForm, totalBudget: Number(e.target.value) })}
-                  className="h-9 text-xs font-mono"
                 />
               </div>
               <div className="space-y-1">
@@ -220,39 +195,6 @@ export function DepartmentDialogs({
         </div>
       )}
 
-      {/* Adjust Budget Modal */}
-      {isBudgetOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-card border rounded-lg max-w-sm w-full p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-semibold text-base">Atur Anggaran {activeDeptName}</h3>
-              <button onClick={onCloseBudget} className="text-muted-foreground hover:text-foreground">
-                <XIcon className="size-4" />
-              </button>
-            </div>
-            <form onSubmit={onSubmitBudget} className="space-y-3.5 text-xs">
-              <div className="space-y-1">
-                <label className="font-medium text-muted-foreground">Total Anggaran (Rp)</label>
-                <Input
-                  type="number"
-                  required
-                  value={budgetVal}
-                  onChange={(e) => onBudgetValChange(Number(e.target.value))}
-                  className="h-9 text-xs font-mono"
-                />
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Perubahan alokasi anggaran akan langsung tercatat untuk tahun buku {activeDeptYear}.
-              </p>
-              <div className="pt-3 border-t flex justify-end gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={onCloseBudget}>Batal</Button>
-                <Button type="submit" size="sm">Perbarui Anggaran</Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Add Member Modal */}
       {isMemberOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
@@ -265,40 +207,29 @@ export function DepartmentDialogs({
             </div>
             <form onSubmit={onSubmitMember} className="space-y-3.5 text-xs">
               <div className="space-y-1">
-                <label className="font-medium text-muted-foreground">Nama Pengguna</label>
-                <Input
-                  required
-                  placeholder="Nama staf / guru..."
-                  value={memberForm.name}
-                  onChange={(e) => onMemberFormChange({ ...memberForm, name: e.target.value })}
-                  className="h-9 text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="font-medium text-muted-foreground">Email</label>
-                <Input
-                  type="email"
-                  required
-                  placeholder="staf@smktibazma.sch.id"
-                  value={memberForm.email}
-                  onChange={(e) => onMemberFormChange({ ...memberForm, email: e.target.value })}
-                  className="h-9 text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="font-medium text-muted-foreground">Peran</label>
                 <select
-                  value={memberForm.role}
-                  onChange={(e) => onMemberFormChange({ ...memberForm, role: e.target.value as any })}
+                  required
+                  value={memberForm.userId}
+                  onChange={(e) => onMemberFormChange({ userId: e.target.value })}
                   className="w-full h-9 px-2 rounded-md border border-input bg-background text-xs"
                 >
-                  <option value="Anggota">Anggota</option>
-                  <option value="Penanggung jawab">Penanggung jawab</option>
+                  <option value="">Pilih pengguna dari tabel User</option>
+                  {memberUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name || user.email} · {user.email} · {ROLE_LABELS[user.role]}
+                    </option>
+                  ))}
                 </select>
+                <p className="text-[10px] text-muted-foreground">
+                  Role akun Kepala Bagian otomatis menjadi Penanggung jawab. Role akun lainnya menjadi Anggota.
+                </p>
+                {memberUsers.length === 0 && (
+                  <p className="text-[10px] text-amber-700">Semua pengguna sudah menjadi anggota departemen ini atau belum ada pengguna terdaftar.</p>
+                )}
               </div>
               <div className="pt-3 border-t flex justify-end gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={onCloseMember}>Batal</Button>
-                <Button type="submit" size="sm">Tambahkan</Button>
+                <Button type="submit" size="sm" disabled={memberUsers.length === 0 || !memberForm.userId}>Tambahkan</Button>
               </div>
             </form>
           </div>
