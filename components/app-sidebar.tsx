@@ -19,6 +19,7 @@ import {
 import { RowsIcon, SignOutIcon, UsersIcon, FileTextIcon, CoinsIcon } from "@phosphor-icons/react"
 import { logoutAction } from "@/app/actions/auth"
 import { Role } from "@/lib/roles"
+import { isRouteAllowed } from "@/lib/route-permissions"
 
 type NavItem = {
   title: string
@@ -47,7 +48,7 @@ const data: { navMain: NavMain[] } = {
       title: "Department",
       url: "/dashboard/department",
       icon: <RowsIcon className="size-4" />,
-            roles: [Role.ADMIN], // Hanya role ADMIN
+      roles: [Role.ADMIN, Role.DEPT_HEAD, Role.STAFF],
 
     },
     {
@@ -87,8 +88,8 @@ export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sideb
         <SidebarGroup>
           <SidebarMenu>
             {data.navMain.map((item) => {
-              // Jika item memiliki pembatasan roles, periksa apakah user memiliki role tersebut
-              if (item.roles && (!user || !item.roles.includes(user.role as Role))) {
+              // Periksa apakah user memiliki hak akses ke rute ini
+              if (!isRouteAllowed(item.url, user?.role)) {
                 return null;
               }
 

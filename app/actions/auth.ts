@@ -8,6 +8,7 @@ import {
   deleteSessionCookie,
   signSessionToken,
 } from "@/lib/session";
+import { isRouteAllowed, getDefaultAllowedRoute } from "@/lib/route-permissions";
 
 export type AuthActionResponse = {
   success?: boolean;
@@ -32,6 +33,7 @@ export async function loginAction(
   const email = formData.get("email")?.toString().trim();
   const password = formData.get("password")?.toString();
   const redirectTarget = getSafeRedirectTarget(formData.get("callbackUrl"));
+  let userRole: string | null = null;
 
   if (!email || !password) {
     return { error: "Email dan password wajib diisi." };
@@ -61,6 +63,7 @@ export async function loginAction(
       role: user.role,
     });
 
+    userRole = user.role;
     await setSessionCookie(token);
   } catch (error) {
     console.error("Login error:", error);
@@ -72,8 +75,12 @@ export async function loginAction(
     };
   }
 
-  // Redirect ke dashboard setelah login sukses
-  redirect(redirectTarget);
+  // Redirect ke rute yang diizinkan untuk role user setelah login sukses
+  const finalTarget = userRole && isRouteAllowed(redirectTarget, userRole)
+    ? redirectTarget
+    : getDefaultAllowedRoute(userRole);
+
+  redirect(finalTarget);
 }
 
 /**
