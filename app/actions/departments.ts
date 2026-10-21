@@ -25,31 +25,6 @@ const canManageDepartments = async () => {
   return user?.role === Role.ADMIN;
 };
 
-const getActor = async () => {
-  const session = await getCurrentUser();
-  if (!session) return null;
-  return prisma.user.findUnique({
-    where: { id: session.id },
-    select: { id: true, role: true },
-  });
-};
-
-const canManageDepartmentMembers = async (actor: { id: string; role: string }, departmentId: string) => {
-  if (actor.role === Role.ADMIN) return true;
-  if (actor.role !== Role.DEPT_HEAD) return false;
-  const membership = await prisma.departmentMember.findFirst({
-    where: {
-      userId: actor.id,
-      departmentId,
-      role: "PIC",
-      status: "ACTIVE",
-      department: { status: "ACTIVE" },
-    },
-    select: { id: true },
-  });
-  return Boolean(membership);
-};
-
 const toStatus = (status: DepartmentInput["status"]) => status === "Aktif" ? "ACTIVE" : "INACTIVE";
 
 const loadDepartment = async (id: string, year: number): Promise<Department | undefined> =>
@@ -58,25 +33,7 @@ const loadDepartment = async (id: string, year: number): Promise<Department | un
 export async function getDepartmentsByBudgetYearAction(year: number) {
   if (!Number.isInteger(year) || year < 1900 || year > 2100) return { error: "Tahun anggaran tidak valid." };
   try {
-    const actor = await getActor();
-    if (!actor || (actor.role !== Role.ADMIN && actor.role !== Role.DEPT_HEAD && actor.role !== Role.STAFF)) {
-      return { error: "Akses ditolak." };
-    }
-    if (actor.role === Role.ADMIN) return { data: await getDepartmentsForView(year) };
-
-    const membershipRole = actor.role === Role.DEPT_HEAD ? "PIC" : "MEMBER";
-    const memberships = await prisma.departmentMember.findMany({
-      where: {
-        userId: actor.id,
-        role: membershipRole,
-        status: "ACTIVE",
-        department: { status: "ACTIVE" },
-      },
-      select: { departmentId: true },
-    });
-    return {
-      data: await getDepartmentsForView(year, memberships.map((membership) => membership.departmentId)),
-    };
+    return { data: await getDepartmentsForView(year) };
   } catch (error) {
     console.error("Load departments by budget year error:", error);
     return { error: "Gagal memuat anggaran departemen." };
@@ -247,12 +204,9 @@ export async function addDepartmentMemberAction(input: {
   userId: string;
   year: number;
 }) {
+  if (!(await canManageDepartments())) return { error: "Hanya Admin yang dapat mengelola anggota." };
   if (!input.departmentId || !input.userId || !Number.isInteger(input.year) || input.year < 1900 || input.year > 2100) {
     return { error: "Departemen, pengguna, atau tahun tidak valid." };
-  }
-  const actor = await getActor();
-  if (!actor || !(await canManageDepartmentMembers(actor, input.departmentId))) {
-    return { error: "Anda tidak memiliki akses mengelola anggota departemen ini." };
   }
 
   try {
@@ -263,19 +217,10 @@ export async function addDepartmentMemberAction(input: {
       ]);
       if (!department || department.status !== "ACTIVE") throw new Error("Departemen tidak aktif atau tidak ditemukan.");
       if (!user) throw new Error("Pengguna tidak ditemukan.");
-      if (actor.role === Role.DEPT_HEAD && user.role !== Role.STAFF) {
-        throw new Error("Dept Head hanya dapat menambahkan pengguna ber-role Staff.");
-      }
 
       const departmentRole = user.role === Role.DEPT_HEAD ? "PIC" : "MEMBER";
       const name = user.name?.trim() || user.email;
       const email = user.email.toLowerCase();
-      const existingMembership = await tx.departmentMember.findUnique({
-        where: { departmentId_userId: { departmentId: input.departmentId, userId: user.id } },
-      });
-      if (existingMembership?.status === "ACTIVE") {
-        throw new Error("Pengguna tersebut sudah terdaftar di departemen ini.");
-      }
 
       if (departmentRole === "PIC") {
         await tx.departmentMember.updateMany({
@@ -283,15 +228,15 @@ export async function addDepartmentMemberAction(input: {
           data: { role: "MEMBER" },
         });
       }
-      const memberData = { name, email, role: departmentRole, status: "ACTIVE" as const };
-      const created = existingMembership
-        ? await tx.departmentMember.update({
-            where: { id: existingMembership.id },
-            data: memberData,
-          })
-        : await tx.departmentMember.create({
-            data: { ...memberData, departmentId: input.departmentId, userId: user.id },
-          });
+      const created = await tx.departmentMember.create({
+        data: {
+          departmentId: input.departmentId,
+          userId: user.id,
+          name,
+          email,
+          role: departmentRole,
+        },
+      });
       if (departmentRole === "PIC") {
         await tx.department.update({ where: { id: input.departmentId }, data: { picName: name } });
       }
@@ -310,18 +255,11 @@ export async function addDepartmentMemberAction(input: {
     revalidatePath("/dashboard/department");
     return { success: true, data };
   } catch (error) {
-    if (error instanceof Error && error.message === "Pengguna tersebut sudah terdaftar di departemen ini.") {
-      return { error: error.message };
-    }
     if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
       return { error: "Pengguna tersebut sudah terdaftar di departemen ini." };
     }
     console.error("Add department member error:", error);
-    const message = error instanceof Error && (
-      error.message === "Pengguna tidak ditemukan."
-      || error.message.startsWith("Departemen")
-      || error.message.startsWith("Dept Head")
-    )
+    const message = error instanceof Error && (error.message === "Pengguna tidak ditemukan." || error.message.startsWith("Departemen"))
       ? error.message
       : "Gagal menambahkan anggota.";
     return { error: message };
@@ -332,19 +270,12 @@ export async function removeDepartmentMemberAction(input: {
   departmentId: string;
   memberId: string;
 }) {
-  const actor = await getActor();
-  if (!actor || !input.departmentId || !(await canManageDepartmentMembers(actor, input.departmentId))) {
-    return { error: "Anda tidak memiliki akses mengelola anggota departemen ini." };
-  }
+  if (!(await canManageDepartments())) return { error: "Hanya Admin yang dapat mengelola anggota." };
   try {
     const member = await prisma.departmentMember.findFirst({
       where: { id: input.memberId, departmentId: input.departmentId },
-      include: { user: { select: { role: true } } },
     });
     if (!member) return { error: "Anggota tidak ditemukan." };
-    if (actor.role === Role.DEPT_HEAD && (member.role !== "MEMBER" || member.user?.role !== Role.STAFF)) {
-      return { error: "Dept Head hanya dapat mengeluarkan anggota dengan role Staff." };
-    }
 
     await prisma.$transaction(async (tx) => {
       await tx.departmentMember.delete({ where: { id: member.id } });

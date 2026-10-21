@@ -25,8 +25,10 @@ type PpdDraftInput = {
 const submissionTypes: Record<string, PPDType> = {
   "Uang Muka": PPDType.UANG_MUKA,
   UANG_MUKA: PPDType.UANG_MUKA,
-  Pembayaran: PPDType.PEMBAYARAN,
-  PEMBAYARAN: PPDType.PEMBAYARAN,
+  Reimbursement: PPDType.REIMBURSEMENT,
+  REIMBURSEMENT: PPDType.REIMBURSEMENT,
+  "Pembayaran Vendor": PPDType.PEMBAYARAN_VENDOR,
+  PEMBAYARAN_VENDOR: PPDType.PEMBAYARAN_VENDOR,
 };
 
 async function getUserId() {
@@ -147,10 +149,7 @@ export async function submitPpdDraftAction(id: string) {
   if (!(await canUserCreatePpdInDepartment(userId, request.department.id))) {
     return { error: "Anda tidak lagi memiliki akses membuat PPD di departemen tersebut." };
   }
-  if (!request.title.trim()) {
-    return { error: "Lengkapi judul pengajuan sebelum mengirim." };
-  }
-  if (request.type === PPDType.UANG_MUKA && (request.items.length === 0 || request.items.some((item) => !item.accountId))) {
+  if (!request.title.trim() || request.items.length === 0 || request.items.some((item) => !item.accountId)) {
     return { error: "Lengkapi judul dan account pada minimal satu item sebelum mengirim." };
   }
   if (Number(request.totalAmount) > Number(request.limitFund)) {

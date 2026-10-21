@@ -32,7 +32,8 @@ enum DepartmentMemberStatus {
 
 enum PPDType {
   UANG_MUKA
-  PEMBAYARAN
+  REIMBURSEMENT
+  PEMBAYARAN_VENDOR
 }
 
 enum PPDStatus {

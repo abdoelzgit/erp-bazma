@@ -19,12 +19,10 @@ import {
   updateDepartmentAction,
 } from "@/app/actions/departments";
 
-export function DepartmentView({ initialDepartments, userOptions, canManageDepartments, canManageMembers, canManageAllMembers }: {
+export function DepartmentView({ initialDepartments, userOptions, canManageMembers }: {
   initialDepartments: Department[];
   userOptions: DepartmentUserOption[];
-  canManageDepartments: boolean;
   canManageMembers: boolean;
-  canManageAllMembers: boolean;
 }) {
   const [departments, setDepartments] = useState<Department[]>(initialDepartments);
   const [selectedDeptId, setSelectedDeptId] = useState<string>(initialDepartments[0]?.id ?? "");
@@ -255,10 +253,6 @@ export function DepartmentView({ initialDepartments, userOptions, canManageDepar
         selectedDeptId={selectedDeptId}
         onSelect={setSelectedDeptId}
         onAdd={handleOpenAddDept}
-        canManageDepartments={canManageDepartments}
-        emptyMessage={initialDepartments.length === 0
-          ? (canManageDepartments ? "Belum ada departemen." : "Anda belum ditugaskan ke departemen aktif. Hubungi Admin untuk meminta akses.")
-          : "Tidak ada departemen yang sesuai dengan filter."}
         search={searchQuery}
         onSearchChange={setSearchQuery}
         status={statusFilter}
@@ -296,7 +290,7 @@ export function DepartmentView({ initialDepartments, userOptions, canManageDepar
                   </Badge>
                 </div>
 
-                {canManageDepartments && <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={handleOpenEditDept}
                     className="gap-1.5 text-xs h-8 px-3 rounded-md border border-input hover:bg-muted inline-flex items-center"
@@ -313,7 +307,7 @@ export function DepartmentView({ initialDepartments, userOptions, canManageDepar
                   >
                     <TrashIcon className="size-3.5" />
                   </button>
-                </div>}
+                </div>
               </div>
 
               <p className="text-xs text-muted-foreground">
@@ -337,16 +331,13 @@ export function DepartmentView({ initialDepartments, userOptions, canManageDepar
               memberRoleFilter={memberRoleFilter}
               onMemberRoleFilterChange={setMemberRoleFilter}
               canManageMembers={canManageMembers}
-              canManageAllMembers={canManageAllMembers}
               onAddMember={() => { setMemberForm({ userId: "" }); setIsAddMemberOpen(true); }}
               onRemoveMember={handleRemoveMember}
             />
           </div>
         ) : (
           <div className="p-12 text-center text-muted-foreground text-sm">
-            {initialDepartments.length === 0
-              ? (canManageDepartments ? "Belum ada departemen untuk ditampilkan." : "Belum ada departemen aktif yang ditugaskan ke akun Anda. Hubungi Admin untuk meminta akses.")
-              : "Tidak ada departemen yang sesuai dengan filter."}
+            Pilih departemen di sebelah kiri untuk melihat detail.
           </div>
         )}
       </main>

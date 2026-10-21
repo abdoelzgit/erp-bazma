@@ -246,13 +246,11 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
                 bank={bank} onBankChange={setBank} accountNo={accountNo} onAccountNoChange={setAccountNo}
                 limitFund={limitFund} onLimitFundChange={setLimitFund}
               />
-              {submissionType === "Uang Muka" && (
-                <PpdReportTable
-                  rows={rows} onAdd={handleAddRow} onUpdate={handleUpdateRow} onRemove={handleRemoveRow}
-                  total={totalAmount} deptName={departmentName} accounts={filteredAccounts}
-                  budgets={initialData.budgets} year={year} month={month}
-                />
-              )}
+              <PpdReportTable
+                rows={rows} onAdd={handleAddRow} onUpdate={handleUpdateRow} onRemove={handleRemoveRow}
+                total={totalAmount} deptName={departmentName} accounts={filteredAccounts}
+                budgets={initialData.budgets} year={year} month={month}
+              />
               {activeDraft.status === "Draft" && <PpdActionBar
                 status={activeDraft.status} onDelete={handleDeleteDraft}
                 onSave={saveDraft} onSubmit={handleSubmitDraft} isSaving={isSaving}

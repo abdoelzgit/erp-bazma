@@ -11,8 +11,6 @@ export type DepartmentSidebarProps = {
   selectedDeptId: string;
   onSelect: (id: string) => void;
   onAdd: () => void;
-  canManageDepartments: boolean;
-  emptyMessage: string;
   search: string;
   onSearchChange: (v: string) => void;
   status: string;
@@ -26,8 +24,6 @@ export function DepartmentSidebar({
   selectedDeptId,
   onSelect,
   onAdd,
-  canManageDepartments,
-  emptyMessage,
   search,
   onSearchChange,
   status,
@@ -45,12 +41,10 @@ export function DepartmentSidebar({
           </p>
         </div>
 
-        {canManageDepartments && (
-          <Button onClick={onAdd} variant="outline" className="w-full justify-center gap-1.5 text-xs font-semibold h-9">
-            <PlusIcon className="size-3.5" />
-            Tambah departemen
-          </Button>
-        )}
+        <Button onClick={onAdd} variant="outline" className="w-full justify-center gap-1.5 text-xs font-semibold h-9">
+          <PlusIcon className="size-3.5" />
+           Tambah departemen
+        </Button>
 
         <div className="space-y-1">
           <label htmlFor="dept-search" className="text-xs font-medium text-foreground">Cari departemen</label>
@@ -114,7 +108,7 @@ export function DepartmentSidebar({
 
         {departments.length === 0 && (
           <div className="p-8 text-center text-xs text-muted-foreground">
-            {emptyMessage}
+            Tidak ada departemen yang sesuai dengan filter.
           </div>
         )}
       </div>

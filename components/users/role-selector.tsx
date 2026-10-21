@@ -78,7 +78,6 @@ export function RoleSelector({
         disabled={isPending}
         value={selectedRole}
         onValueChange={handleValueChange}
-        items={ROLE_OPTIONS}
       >
         <SelectTrigger className="w-[140px] h-8 text-xs">
           <SelectValue placeholder="Pilih Role" />

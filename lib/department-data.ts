@@ -9,15 +9,10 @@ const formatDate = (date: Date) =>
     timeZone: "Asia/Jakarta",
   }).format(date);
 
-export async function getDepartmentsForView(
-  year: number,
-  allowedDepartmentIds?: readonly string[],
-): Promise<DepartmentViewModel[]> {
+export async function getDepartmentsForView(year: number): Promise<DepartmentViewModel[]> {
   const departments = await prisma.department.findMany({
-    where: allowedDepartmentIds ? { id: { in: [...allowedDepartmentIds] } } : undefined,
     include: {
       members: {
-        where: { status: "ACTIVE" },
         include: { user: { select: { name: true, email: true, role: true } } },
         orderBy: [{ role: "asc" }, { name: "asc" }],
       },

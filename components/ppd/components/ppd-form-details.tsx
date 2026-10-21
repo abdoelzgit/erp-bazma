@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -31,96 +30,6 @@ export type PpdFormDetailsProps = {
   onLimitFundChange: (v: string) => void;
 };
 
-type Option = { value: string; label: string };
-
-const SUBMISSION_TYPES: Option[] = [
-  { value: "UANG_MUKA", label: "Uang Muka (Advance)" },
-  { value: "PEMBAYARAN", label: "Pembayaran (Payment)" },
-];
-
-const PAYMENT_TYPES: Option[] = [
-  { value: "Transfer", label: "Transfer Bank" },
-  { value: "Tunai / Kas", label: "Tunai / Kas Sekolah" },
-  { value: "Giro", label: "Cek / Bilyet Giro" },
-];
-
-const BANKS: Option[] = [
-  { value: "Bank Syariah Indonesia (BSI)", label: "Bank Syariah Indonesia (BSI)" },
-  { value: "Bank Mandiri", label: "Bank Mandiri" },
-  { value: "Bank BCA", label: "Bank Central Asia (BCA)" },
-  { value: "Bank BRI", label: "Bank Rakyat Indonesia (BRI)" },
-  { value: "Bank BNI", label: "Bank Negara Indonesia (BNI)" },
-];
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
-      <h3 className="mb-4 border-b pb-3 text-sm font-semibold">{title}</h3>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>
-    </section>
-  );
-}
-
-function Field({
-  id,
-  label,
-  className,
-  children,
-}: {
-  id: string;
-  label: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={`min-w-0 space-y-1.5 ${className ?? ""}`}>
-      <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-function OptionSelect({
-  id,
-  value,
-  onChange,
-  options,
-  placeholder,
-}: {
-  id: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: Option[];
-  placeholder: string;
-}) {
-  return (
-    <Select
-      value={value}
-      onValueChange={(v) => v && onChange(v)}
-      items={options}
-    >
-      <SelectTrigger id={id} className="h-10 w-full text-sm">
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value}>
-            {opt.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
 export function PpdFormDetails({
   title,
   onTitleChange,
@@ -140,95 +49,74 @@ export function PpdFormDetails({
   limitFund,
   onLimitFundChange,
 }: PpdFormDetailsProps) {
-  const deptOptions: Option[] = departments.map((d) => ({
-    value: d.id,
-    label: d.name,
-  }));
-
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
-      <Section title="Detail pengajuan">
-        <Field id="p-title" label="Judul" className="sm:col-span-2">
-          <Input
-            id="p-title"
-            value={title}
-            onChange={(e) => onTitleChange(e.target.value)}
-            className="h-10 text-sm"
-          />
-        </Field>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="rounded-lg border bg-card p-5 space-y-4 shadow-xs">
+        <h3 className="font-semibold text-sm">Form detail submission</h3>
+        <div className="space-y-1.5">
+          <label htmlFor="p-title" className="text-xs font-medium text-muted-foreground">Title</label>
+          <Input id="p-title" value={title} onChange={(e) => onTitleChange(e.target.value)} className="text-sm" />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="p-desc" className="text-xs font-medium text-muted-foreground">Description</label>
+          <Textarea id="p-desc" value={description} onChange={(e) => onDescriptionChange(e.target.value)} rows={3} className="text-sm resize-none" />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="p-dept" className="text-xs font-medium text-muted-foreground">Departemen</label>
+          <Select value={deptId} onValueChange={(v) => v && onDeptIdChange(v)}>
+            <SelectTrigger id="p-dept" className="h-10 text-sm">
+              <SelectValue placeholder="Pilih departemen" />
+            </SelectTrigger>
+            <SelectContent>
+              {departments.map((dept) => (
+                <SelectItem key={dept.id} value={dept.id}>
+                  {dept.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="p-sub" className="text-xs font-medium text-muted-foreground">Submission Type</label>
+          <select id="p-sub" value={submissionType} onChange={(e) => onSubmissionTypeChange(e.target.value)} className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none">
+            <option value="">Select submission type</option>
+            <option value="Uang Muka">Uang Muka (Advance)</option>
+            <option value="Reimbursement">Reimbursement (Penggantian)</option>
+            <option value="Pembayaran Vendor">Pembayaran Langsung Vendor</option>
+          </select>
+        </div>
+      </div>
 
-        <Field id="p-desc" label="Deskripsi" className="sm:col-span-2">
-          <Textarea
-            id="p-desc"
-            value={description}
-            onChange={(e) => onDescriptionChange(e.target.value)}
-            rows={3}
-            className="resize-none text-sm"
-          />
-        </Field>
-
-        <Field id="p-dept" label="Departemen">
-          <OptionSelect
-            id="p-dept"
-            value={deptId}
-            onChange={onDeptIdChange}
-            options={deptOptions}
-            placeholder="Pilih departemen"
-          />
-        </Field>
-
-        <Field id="p-sub" label="Jenis pengajuan">
-          <OptionSelect
-            id="p-sub"
-            value={submissionType}
-            onChange={onSubmissionTypeChange}
-            options={SUBMISSION_TYPES}
-            placeholder="Pilih jenis pengajuan"
-          />
-        </Field>
-      </Section>
-
-      <Section title="Metode pembayaran">
-        <Field id="p-pay" label="Tipe" className="sm:col-span-2">
-          <OptionSelect
-            id="p-pay"
-            value={paymentType}
-            onChange={onPaymentTypeChange}
-            options={PAYMENT_TYPES}
-            placeholder="Pilih tipe pembayaran"
-          />
-        </Field>
-
-        <Field id="p-bank" label="Bank" className="sm:col-span-2">
-          <OptionSelect
-            id="p-bank"
-            value={bank}
-            onChange={onBankChange}
-            options={BANKS}
-            placeholder="Pilih bank"
-          />
-        </Field>
-
-        <Field id="p-acc" label="No. rekening">
-          <Input
-            id="p-acc"
-            inputMode="numeric"
-            value={accountNo}
-            onChange={(e) => onAccountNoChange(e.target.value)}
-            className="h-10 font-mono text-sm"
-          />
-        </Field>
-
-        <Field id="p-limit" label="Total limit dana">
-          <Input
-            id="p-limit"
-            inputMode="numeric"
-            value={limitFund}
-            onChange={(e) => onLimitFundChange(e.target.value)}
-            className="h-10 text-sm font-medium"
-          />
-        </Field>
-      </Section>
+      <div className="rounded-lg border bg-card p-5 space-y-4 shadow-xs">
+        <h3 className="font-semibold text-sm">Form payment method</h3>
+        <div className="space-y-1.5">
+          <label htmlFor="p-pay" className="text-xs font-medium text-muted-foreground">Type</label>
+          <select id="p-pay" value={paymentType} onChange={(e) => onPaymentTypeChange(e.target.value)} className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none">
+            <option value="Transfer">Transfer Bank</option>
+            <option value="Tunai / Kas">Tunai / Kas Sekolah</option>
+            <option value="Giro">Cek / Bilyet Giro</option>
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="p-bank" className="text-xs font-medium text-muted-foreground">Bank</label>
+          <select id="p-bank" value={bank} onChange={(e) => onBankChange(e.target.value)} className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none">
+            <option value="">Select Bank</option>
+            <option value="Bank Syariah Indonesia (BSI)">Bank Syariah Indonesia (BSI)</option>
+            <option value="Bank Mandiri">Bank Mandiri</option>
+            <option value="Bank BCA">Bank Central Asia (BCA)</option>
+            <option value="Bank BRI">Bank Rakyat Indonesia (BRI)</option>
+            <option value="Bank BNI">Bank Negara Indonesia (BNI)</option>
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="p-acc" className="text-xs font-medium text-muted-foreground">Account No</label>
+          <Input id="p-acc" value={accountNo} onChange={(e) => onAccountNoChange(e.target.value)} className="text-sm font-mono" />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="p-limit" className="text-xs font-medium text-muted-foreground">Total limit fund</label>
+          <Input id="p-limit" value={limitFund} onChange={(e) => onLimitFundChange(e.target.value)} className="text-sm font-medium" />
+        </div>
+      </div>
     </div>
   );
 }
