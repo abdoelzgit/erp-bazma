@@ -91,6 +91,7 @@ export function CreateBudgetDialog({
             <Select
               value={selectedDeptId}
               onValueChange={(v) => { if (v) onDeptChange(v); onAccountNameChange(""); onAccountCodeChange(""); onErrorChange(null); }}
+              items={departments.map((d) => ({ value: d.id, label: `${d.name} (${d.code})` }))}
             >
               <SelectTrigger id="c-dept" className="w-full">
                 <SelectValue placeholder="Pilih departemen" />

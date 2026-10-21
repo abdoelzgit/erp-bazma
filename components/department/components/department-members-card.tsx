@@ -14,6 +14,7 @@ export type DepartmentMembersCardProps = {
   memberRoleFilter: string;
   onMemberRoleFilterChange: (v: string) => void;
   canManageMembers: boolean;
+  canManageAllMembers: boolean;
   onAddMember: () => void;
   onRemoveMember: (memberId: string, memberName: string) => void;
 };
@@ -25,6 +26,7 @@ export function DepartmentMembersCard({
   memberRoleFilter,
   onMemberRoleFilterChange,
   canManageMembers,
+  canManageAllMembers,
   onAddMember,
   onRemoveMember,
 }: DepartmentMembersCardProps) {
@@ -107,14 +109,16 @@ export function DepartmentMembersCard({
                   </span>
                 </td>
                 <td className="p-3 text-right">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onRemoveMember(member.id, member.name)}
-                    className="h-7 text-xs px-2.5 hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    Keluarkan
-                  </Button>
+                  {canManageMembers && (canManageAllMembers || (member.role === "Anggota" && member.userRole === "STAFF")) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onRemoveMember(member.id, member.name)}
+                      className="h-7 text-xs px-2.5 hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      Keluarkan
+                    </Button>
+                  )}
                 </td>
               </tr>
             ))}

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/session";
 import { AppSidebar } from "@/components/app-sidebar";
+import { prisma } from "@/lib/prisma";
 import {
   SidebarInset,
   SidebarProvider,
@@ -11,7 +12,10 @@ async function DashboardContent({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getCurrentUser();
+  const session = await getCurrentUser();
+  const user = session
+    ? await prisma.user.findUnique({ where: { id: session.id }, select: { role: true } })
+    : null;
 
   return (
     <SidebarProvider>
