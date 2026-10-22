@@ -219,7 +219,7 @@ export function PpdFormDetails({
           />
         </Field>
 
-        <Field id="p-limit" label="Total limit dana">
+        <Field id="p-limit" label="Jumlah Pengajuan">
           <Input
             id="p-limit"
             inputMode="numeric"

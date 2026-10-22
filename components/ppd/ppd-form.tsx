@@ -9,6 +9,26 @@ import { PpdFormDetails } from "./components/ppd-form-details";
 import { PpdReportTable } from "./components/ppd-report-table";
 import { PpdActionBar } from "./components/ppd-action-bar";
 
+const budgetKey = (accountId: string, year: number, month: number) =>
+  `${accountId}|${year}|${month}`;
+
+function getDraftReservations(draft?: Draft): Record<string, number> {
+  if (
+    !draft ||
+    (draft.status !== "Draft" && draft.status !== "Submitted") ||
+    draft.submissionType !== "UANG_MUKA"
+  ) {
+    return {};
+  }
+
+  return draft.rows.reduce<Record<string, number>>((totals, row) => {
+    if (!row.accountId) return totals;
+    const key = budgetKey(row.accountId, draft.year, draft.month);
+    totals[key] = (totals[key] ?? 0) + (Number(row.amount) || 0);
+    return totals;
+  }, {});
+}
+
 export function PpdForm({ initialData }: { initialData: PpdPageData }) {
   const initialDraft = initialData.drafts[0];
   const [drafts, setDrafts] = useState(initialData.drafts);
@@ -26,6 +46,7 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
   const [accountNo, setAccountNo] = useState(initialDraft?.accountNo ?? "");
   const [limitFund, setLimitFund] = useState(initialDraft?.limitFund ?? "");
   const [rows, setRows] = useState<ReportRow[]>(initialDraft?.rows ?? []);
+  const [budgets, setBudgets] = useState(initialData.budgets);
   const [selectedAccountId, setSelectedAccountId] = useState(
     initialDraft?.rows.find((row) => row.accountId)?.accountId ?? "",
   );
@@ -119,6 +140,55 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
   const handleRemoveRow = (id: string) => setRows((previous) => previous.filter((row) => row.id !== id));
   const totalAmount = useMemo(() => rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0), [rows]);
 
+  const changeBudgetReservations = (previousDraft?: Draft, nextDraft?: Draft) => {
+    const previous = getDraftReservations(previousDraft);
+    const next = getDraftReservations(nextDraft);
+    const affectedKeys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+
+    setBudgets((current) => {
+      const updated = { ...current };
+      for (const key of affectedKeys) {
+        const budget = updated[key];
+        if (!budget) continue;
+        const delta = (next[key] ?? 0) - (previous[key] ?? 0);
+        updated[key] = { ...budget, reserved: Math.max(0, budget.reserved + delta) };
+      }
+      return updated;
+    });
+  };
+
+  const getPersistedRows = () => {
+    const accountName = initialData.accounts.find((account) => account.id === selectedAccountId)?.name ?? null;
+    return rows.map((row) => ({
+      ...row,
+      id: row.id.startsWith("new-") ? crypto.randomUUID() : row.id,
+      accountId: selectedAccountId || null,
+      accountName,
+    }));
+  };
+
+  const buildSavedDraft = (id: string, status: Draft["status"]): Draft => {
+    const savedAt = new Date().toISOString();
+    return {
+      id,
+      title: formTitle,
+      description: formDescription,
+      category: submissionType || "Draft",
+      timeAgo: new Date(savedAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }),
+      deptId,
+      submissionType,
+      paymentType,
+      bank,
+      accountNo,
+      limitFund: String(Number(limitFund.replace(/[^\d.-]/g, "")) || 0),
+      status,
+      year,
+      month,
+      updatedAt: savedAt,
+      rows: getPersistedRows(),
+    };
+  };
+
   const saveDraft = async () => {
     setIsSaving(true);
     const result = await savePpdDraftAction({
@@ -143,25 +213,8 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
     setIsSaving(false);
     if (result.error || !result.id) return setFeedback(result.error ?? "Gagal menyimpan draft.");
 
-    const savedAt = new Date().toISOString();
-    const savedDraft = {
-      id: result.id,
-      title: formTitle,
-      description: formDescription,
-      category: submissionType || "Draft",
-      timeAgo: new Date(savedAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }),
-      deptId,
-      submissionType,
-      paymentType,
-      bank,
-      accountNo,
-      limitFund: String(Number(limitFund.replace(/[^\d.-]/g, "")) || 0),
-      status: "Draft" as const,
-      year,
-      month,
-      updatedAt: savedAt,
-      rows: rows.map((row) => ({ ...row, id: row.id.startsWith("new-") ? crypto.randomUUID() : row.id })),
-    };
+    const savedDraft = buildSavedDraft(result.id, "Draft");
+    changeBudgetReservations(activeDraft, savedDraft);
     setDrafts((previous) => [savedDraft, ...previous.filter((draft) => draft.id !== savedDraft.id)]);
     setSelectedDraftId(savedDraft.id);
     setFeedback("Draft PPD berhasil disimpan.");
@@ -195,6 +248,7 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
     if (!activeDraft) return;
     const result = await deletePpdDraftAction(activeDraft.id);
     if (result.error) return setFeedback(result.error);
+    changeBudgetReservations(activeDraft, undefined);
     const remaining = drafts.filter((draft) => draft.id !== activeDraft.id);
     const nextDraft = remaining[0];
     setDrafts(remaining);
@@ -212,11 +266,13 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
       items: rows.map((row) => ({ accountId: selectedAccountId || null, description: row.description, attachmentName: row.attachmentName, amount: Number(row.amount) || 0 })),
     });
     if (saved.error) return setFeedback(saved.error);
+    const savedDraft = buildSavedDraft(activeDraft.id, "Draft");
+    changeBudgetReservations(activeDraft, savedDraft);
+    setDrafts((previous) => [savedDraft, ...previous.filter((draft) => draft.id !== savedDraft.id)]);
     const result = await submitPpdDraftAction(activeDraft.id);
     if (result.error) return setFeedback(result.error);
-    setDrafts((previous) => previous.map((draft) => draft.id === activeDraft.id
-      ? { ...draft, title: formTitle, description: formDescription, deptId, submissionType, status: "Submitted" }
-      : draft));
+    const submittedDraft = { ...savedDraft, status: "Submitted" as const };
+    setDrafts((previous) => previous.map((draft) => draft.id === activeDraft.id ? submittedDraft : draft));
     setFeedback("Permohonan dana (PPD) berhasil dikirim.");
   };
 
@@ -265,9 +321,10 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
               />
               {submissionType === "UANG_MUKA" && (
                 <PpdReportTable
+                  draftId={activeDraft.id}
                   rows={rows} onAdd={handleAddRow} onUpdate={handleUpdateRow} onRemove={handleRemoveRow}
                   total={totalAmount} deptName={departmentName} accounts={filteredAccounts}
-                  budgets={initialData.budgets} year={year} month={month}
+                  budgets={budgets} year={year} month={month}
                   selectedAccountId={selectedAccountId} onAccountChange={handleAccountChange}
                 />
               )}

@@ -1,17 +1,32 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
+  ArrowsDownUpIcon,
+  CaretRightIcon,
   MagnifyingGlassIcon,
   PlusIcon,
-  CaretRightIcon,
-  ArrowsDownUpIcon,
 } from "@phosphor-icons/react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import type { Draft } from "../ppd.types";
+
+const CATEGORY_OPTIONS = [
+  { value: "All", label: "Semua" },
+  { value: "Draft", label: "Draft" },
+  { value: "Submitted", label: "Diajukan" },
+];
 
 export type PpdSidebarProps = {
   drafts: Draft[];
@@ -46,7 +61,7 @@ export function PpdSidebar({
 
   return (
     <aside className="flex w-full shrink-0 flex-col border-r bg-muted/20 lg:h-full lg:min-h-0 lg:w-80">
-      <div className="shrink-0 space-y-3 border-b p-4">
+      <div className="shrink-0 space-y-3 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-bold tracking-tight text-foreground">Permohonan</h2>
@@ -55,6 +70,7 @@ export function PpdSidebar({
             </Badge>
           </div>
           <Button
+            type="button"
             size="sm"
             variant="outline"
             onClick={onCompose}
@@ -66,82 +82,109 @@ export function PpdSidebar({
         </div>
 
         <div className="relative">
-          <MagnifyingGlassIcon className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+          <MagnifyingGlassIcon
+            className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
           <Input
             id="ppd-draft-search"
-            type="text"
+            type="search"
             placeholder="Cari permohonan..."
             aria-label="Cari permohonan"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-8 h-9 text-xs bg-background"
+            className="h-9 bg-background pl-8 text-xs"
           />
         </div>
 
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-          <select
+        <div className="flex items-center justify-between gap-2">
+          <Select
             value={category}
-            onChange={(e) => onCategoryChange(e.target.value)}
-            aria-label="Filter status permohonan"
-            className="bg-background border rounded px-2 py-1 text-xs text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            onValueChange={(value) => value && onCategoryChange(value)}
+            items={CATEGORY_OPTIONS}
           >
-            <option value="All">Semua permohonan</option>
-            <option value="Draft">Draft</option>
-            <option value="Submitted">Diajukan</option>
-          </select>
+            <SelectTrigger
+              aria-label="Filter status permohonan"
+              className="h-8 w-auto min-w-40 bg-background text-xs"
+            >
+              <SelectValue placeholder="Filter status" />
+            </SelectTrigger>
+            <SelectContent>
+              {CATEGORY_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setSortNewestFirst((newestFirst) => !newestFirst)}
             aria-label={`Urutkan berdasarkan waktu perubahan, ${sortNewestFirst ? "terbaru dahulu" : "terlama dahulu"}`}
-            className="flex min-h-9 items-center gap-1 rounded px-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
           >
-            <span>{sortNewestFirst ? "Terbaru" : "Terlama"}</span>
+            {sortNewestFirst ? "Terbaru" : "Terlama"}
             <ArrowsDownUpIcon className="size-3" />
-          </button>
+          </Button>
         </div>
       </div>
 
+      <Separator />
+
       <ScrollArea className="min-h-0 flex-1 overscroll-contain">
-        <div className="divide-y divide-border/60">
-          {sortedDrafts.map((draft) => {
-          const isSelected = draft.id === selectedDraftId;
-          return (
-            <button
-              type="button"
-              key={draft.id}
-              onClick={() => onSelect(draft.id)}
-              aria-pressed={isSelected}
-              className={`relative block w-full p-3.5 text-left transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring group ${
-                isSelected
-                  ? "bg-accent/80 text-accent-foreground"
-                  : "hover:bg-muted/50"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="font-semibold text-sm leading-snug line-clamp-1 text-foreground">
-                  {draft.title || "Draft tanpa judul"}
-                </h3>
-                {isSelected && (
-                  <CaretRightIcon className="size-4 shrink-0 text-muted-foreground mt-0.5" />
-                )}
-              </div>
+        <div>
+          {sortedDrafts.map((draft, index) => {
+            const isSelected = draft.id === selectedDraftId;
+            const isSubmitted = draft.status === "Submitted";
+            return (
+              <Fragment key={draft.id}>
+                {index > 0 && <Separator className="bg-border/60" />}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => onSelect(draft.id)}
+                  aria-pressed={isSelected}
+                  className={cn(
+                    "h-auto w-full flex-col items-stretch justify-start gap-0 whitespace-normal rounded-none p-3.5 text-left font-normal",
+                    isSelected
+                      ? "bg-accent/80 text-accent-foreground hover:bg-accent/80"
+                      : "hover:bg-muted/50",
+                  )}
+                >
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="line-clamp-1 text-sm font-semibold leading-snug text-foreground">
+                      {draft.title || "Draft tanpa judul"}
+                    </span>
+                    {isSelected && (
+                      <CaretRightIcon
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </span>
 
-              <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                {draft.description || "Belum ada keterangan"}
-              </p>
+                  <span className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                    {draft.description || "Belum ada keterangan"}
+                  </span>
 
-              <div className="flex items-center justify-between mt-2.5 text-[11px] text-muted-foreground">
-                <span className="font-medium bg-muted/60 px-1.5 py-0.5 rounded text-[10px]">
-                  {draft.status === "Submitted" ? "Diajukan" : "Draft"}
-                </span>
-                <span>{draft.timeAgo}</span>
-              </div>
-            </button>
-          );
+                  <span className="mt-2.5 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <Badge
+                      variant={isSubmitted ? "default" : "secondary"}
+                      className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+                    >
+                      {isSubmitted ? "Diajukan" : "Draft"}
+                    </Badge>
+                    <span>{draft.timeAgo}</span>
+                  </span>
+                </Button>
+              </Fragment>
+            );
           })}
 
-        {sortedDrafts.length === 0 && (
+          {sortedDrafts.length === 0 && (
             <div className="p-8 text-center text-xs text-muted-foreground">
               Tidak ada draft yang cocok.
             </div>
@@ -149,7 +192,9 @@ export function PpdSidebar({
         </div>
       </ScrollArea>
 
-      <div className="shrink-0 border-t bg-muted/10 p-3 text-center text-[11px] text-muted-foreground">
+      <Separator />
+
+      <div className="shrink-0 bg-muted/10 p-3 text-center text-[11px] text-muted-foreground">
         Menampilkan {drafts.length} permohonan
       </div>
     </aside>

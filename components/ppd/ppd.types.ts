@@ -31,5 +31,5 @@ export type PpdPageData = {
   drafts: Draft[];
   departments: Array<{ id: string; name: string }>;
   accounts: Array<{ id: string; deptId: string; code: string; name: string }>;
-  budgets: Record<string, { amount: number; realized: number }>;
+  budgets: Record<string, { amount: number; realized: number; reserved: number }>;
 };

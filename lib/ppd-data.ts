@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { getPpdDepartmentAccessWhere } from "@/lib/ppd-access";
+import { PPDType } from "@prisma/client";
 import type { PpdPageData } from "@/components/ppd/ppd.types";
 
 const budgetKey = (accountId: string, year: number, month: number) => `${accountId}|${year}|${month}`;
@@ -16,7 +17,7 @@ export async function getPpdPageData(): Promise<PpdPageData> {
       })
     : [];
   const departmentIds = departments.map((department) => department.id);
-  const [requests, accountRecords, budgets] = await Promise.all([
+  const [requests, accountRecords, budgets, activeRequests] = await Promise.all([
     session && departmentIds.length
       ? prisma.pPDRequest.findMany({
           where: { requestedById: session.id, departmentId: { in: departmentIds } },
@@ -37,7 +38,30 @@ export async function getPpdPageData(): Promise<PpdPageData> {
           select: { accountId: true, year: true, month: true, amount: true, realizedAmount: true },
         })
       : Promise.resolve([]),
+    departmentIds.length
+      ? prisma.pPDRequest.findMany({
+          where: {
+            departmentId: { in: departmentIds },
+            status: { in: ["DRAFT", "SUBMITTED", "APPROVED_DEPT", "APPROVED_FINANCE"] },
+            type: PPDType.UANG_MUKA,
+          },
+          select: {
+            year: true,
+            month: true,
+            items: { select: { accountId: true, amount: true } },
+          },
+        })
+      : Promise.resolve([]),
   ]);
+
+  const reservedByBudget = new Map<string, number>();
+  for (const request of activeRequests) {
+    for (const item of request.items) {
+      if (!item.accountId) continue;
+      const key = budgetKey(item.accountId, request.year, request.month);
+      reservedByBudget.set(key, (reservedByBudget.get(key) ?? 0) + Number(item.amount));
+    }
+  }
 
   return {
     drafts: requests.map((request) => ({
@@ -74,7 +98,11 @@ export async function getPpdPageData(): Promise<PpdPageData> {
     })),
     budgets: Object.fromEntries(budgets.map((budget) => [
       budgetKey(budget.accountId, budget.year, budget.month),
-      { amount: Number(budget.amount), realized: Number(budget.realizedAmount) },
+      {
+        amount: Number(budget.amount),
+        realized: Number(budget.realizedAmount),
+        reserved: reservedByBudget.get(budgetKey(budget.accountId, budget.year, budget.month)) ?? 0,
+      },
     ])),
   };
 }
