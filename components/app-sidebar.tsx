@@ -45,7 +45,7 @@ const data: { navMain: NavMain[] } = {
       icon: <FileTextIcon className="size-4" />,
     },
     {
-      title: "Department",
+      title: "Departemen",
       url: "/dashboard/department",
       icon: <RowsIcon className="size-4" />,
       roles: [Role.ADMIN, Role.DEPT_HEAD, Role.STAFF],
@@ -72,13 +72,12 @@ export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sideb
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<a href="#" />}>
+            <SidebarMenuButton size="lg" render={<a href="/dashboard" />}>
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                 <RowsIcon className="size-4" />
               </div>
               <div className="flex flex-col gap-0.5 leading-none">
                 <span className="font-medium">ERP Bazma</span>
-                <span className="text-xs text-muted-foreground">v1.0.0</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>

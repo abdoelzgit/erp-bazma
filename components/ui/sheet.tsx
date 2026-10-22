@@ -72,7 +72,7 @@ function SheetContent({
           >
             <XIcon
             />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">Tutup panel</span>
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Popup>

@@ -1,58 +1,57 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import { savePpdDraftAction, deletePpdDraftAction, submitPpdDraftAction } from "@/app/actions/ppd";
-import type { PpdPageData, ReportRow } from "./ppd.types";
+import type { Draft, PpdPageData, ReportRow } from "./ppd.types";
 import { PpdSidebar } from "./components/ppd-sidebar";
 import { PpdFormDetails } from "./components/ppd-form-details";
 import { PpdReportTable } from "./components/ppd-report-table";
 import { PpdActionBar } from "./components/ppd-action-bar";
 
 export function PpdForm({ initialData }: { initialData: PpdPageData }) {
+  const initialDraft = initialData.drafts[0];
   const [drafts, setDrafts] = useState(initialData.drafts);
-  const [selectedDraftId, setSelectedDraftId] = useState(initialData.drafts[0]?.id ?? "");
+  const [selectedDraftId, setSelectedDraftId] = useState(initialDraft?.id ?? "");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [formTitle, setFormTitle] = useState("");
-  const [formDescription, setFormDescription] = useState("");
-  const [deptId, setDeptId] = useState("");
-  const [submissionType, setSubmissionType] = useState("");
-  const [paymentType, setPaymentType] = useState("Transfer");
-  const [bank, setBank] = useState("");
-  const [accountNo, setAccountNo] = useState("");
-  const [limitFund, setLimitFund] = useState("");
-  const [rows, setRows] = useState<ReportRow[]>([]);
+  const [formTitle, setFormTitle] = useState(initialDraft?.title ?? "");
+  const [formDescription, setFormDescription] = useState(initialDraft?.description ?? "");
+  const [deptId, setDeptId] = useState(initialDraft?.deptId ?? "");
+  const [submissionType, setSubmissionType] = useState(initialDraft?.submissionType ?? "");
+  const [paymentType, setPaymentType] = useState(initialDraft?.paymentType ?? "Transfer");
+  const [bank, setBank] = useState(initialDraft?.bank ?? "");
+  const [accountNo, setAccountNo] = useState(initialDraft?.accountNo ?? "");
+  const [limitFund, setLimitFund] = useState(initialDraft?.limitFund ?? "");
+  const [rows, setRows] = useState<ReportRow[]>(initialDraft?.rows ?? []);
+  const [selectedAccountId, setSelectedAccountId] = useState(
+    initialDraft?.rows.find((row) => row.accountId)?.accountId ?? "",
+  );
 
   const activeDraft = drafts.find((draft) => draft.id === selectedDraftId);
   const year = activeDraft?.year ?? new Date().getFullYear();
   const month = activeDraft?.month ?? new Date().getMonth() + 1;
 
-  useEffect(() => {
-    if (!activeDraft) {
-      setFormTitle("");
-      setFormDescription("");
-      setDeptId("");
-      setSubmissionType("");
-      setPaymentType("Transfer");
-      setBank("");
-      setAccountNo("");
-      setLimitFund("");
-      setRows([]);
-      return;
-    }
-    setFormTitle(activeDraft.title);
-    setFormDescription(activeDraft.description);
-    setDeptId(activeDraft.deptId);
-    setSubmissionType(activeDraft.submissionType);
-    setPaymentType(activeDraft.paymentType);
-    setBank(activeDraft.bank);
-    setAccountNo(activeDraft.accountNo);
-    setLimitFund(activeDraft.limitFund);
-    setRows(activeDraft.rows);
-  }, [activeDraft]);
+  const loadDraft = (draft?: Draft) => {
+    setFormTitle(draft?.title ?? "");
+    setFormDescription(draft?.description ?? "");
+    setDeptId(draft?.deptId ?? "");
+    setSubmissionType(draft?.submissionType ?? "");
+    setPaymentType(draft?.paymentType ?? "Transfer");
+    setBank(draft?.bank ?? "");
+    setAccountNo(draft?.accountNo ?? "");
+    setLimitFund(draft?.limitFund ?? "");
+    setRows(draft?.rows ?? []);
+    setSelectedAccountId(draft?.rows.find((row) => row.accountId)?.accountId ?? "");
+  };
+
+  const handleSelectDraft = (draftId: string) => {
+    if (draftId === selectedDraftId) return;
+    setSelectedDraftId(draftId);
+    loadDraft(drafts.find((draft) => draft.id === draftId));
+  };
 
   const filteredDrafts = useMemo(() => drafts.filter((draft) => {
     const query = searchQuery.toLowerCase();
@@ -74,12 +73,22 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
 
   const handleAddRow = () => setRows((previous) => [...previous, {
     id: `new-${crypto.randomUUID()}`,
-    accountId: null,
-    accountName: null,
+    accountId: selectedAccountId || null,
+    accountName: initialData.accounts.find((account) => account.id === selectedAccountId)?.name ?? null,
     description: "",
     attachmentName: "",
     amount: 0,
   }]);
+
+  const handleAccountChange = (accountId: string) => {
+    const accountName = initialData.accounts.find((account) => account.id === accountId)?.name ?? null;
+    setSelectedAccountId(accountId);
+    setRows((previous) => previous.map((row) => ({
+      ...row,
+      accountId,
+      accountName,
+    })));
+  };
 
   const handleUpdateRow = (id: string, field: keyof ReportRow, value: string | number | null) => {
     setRows((previous) => previous.map((row) => {
@@ -97,6 +106,11 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
     const allowedAccountIds = new Set(
       initialData.accounts.filter((account) => account.deptId === newDepartmentId).map((account) => account.id),
     );
+    if (!allowedAccountIds.has(selectedAccountId)) {
+      setSelectedAccountId("");
+      setRows((previous) => previous.map((row) => ({ ...row, accountId: null, accountName: null })));
+      return;
+    }
     setRows((previous) => previous.map((row) => row.accountId && !allowedAccountIds.has(row.accountId)
       ? { ...row, accountId: null, accountName: null }
       : row));
@@ -120,7 +134,7 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
       year,
       month,
       items: rows.map((row) => ({
-        accountId: row.accountId,
+        accountId: selectedAccountId || null,
         description: row.description,
         attachmentName: row.attachmentName,
         amount: Number(row.amount) || 0,
@@ -174,6 +188,7 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
     };
     setDrafts((previous) => [newDraft, ...previous]);
     setSelectedDraftId(newDraft.id);
+    loadDraft(newDraft);
   };
 
   const handleDeleteDraft = async () => {
@@ -181,8 +196,10 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
     const result = await deletePpdDraftAction(activeDraft.id);
     if (result.error) return setFeedback(result.error);
     const remaining = drafts.filter((draft) => draft.id !== activeDraft.id);
+    const nextDraft = remaining[0];
     setDrafts(remaining);
-    setSelectedDraftId(remaining[0]?.id ?? "");
+    setSelectedDraftId(nextDraft?.id ?? "");
+    loadDraft(nextDraft);
     setFeedback("Draft berhasil dihapus.");
   };
 
@@ -192,7 +209,7 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
       id: activeDraft.id, title: formTitle, description: formDescription, departmentId: deptId,
       submissionType, paymentType, bank, accountNo,
       limitFund: Number(limitFund.replace(/[^\d.-]/g, "")) || 0, year, month,
-      items: rows.map((row) => ({ accountId: row.accountId, description: row.description, attachmentName: row.attachmentName, amount: Number(row.amount) || 0 })),
+      items: rows.map((row) => ({ accountId: selectedAccountId || null, description: row.description, attachmentName: row.attachmentName, amount: Number(row.amount) || 0 })),
     });
     if (saved.error) return setFeedback(saved.error);
     const result = await submitPpdDraftAction(activeDraft.id);
@@ -204,18 +221,18 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-full min-h-[calc(100vh-4rem)] bg-background">
+    <div className="flex min-h-[calc(100svh-4rem)] flex-col bg-background lg:h-svh lg:min-h-0 lg:flex-row">
       <PpdSidebar
         drafts={filteredDrafts}
         selectedDraftId={selectedDraftId}
-        onSelect={setSelectedDraftId}
+        onSelect={handleSelectDraft}
         onCompose={handleCreateNewDraft}
         search={searchQuery}
         onSearchChange={setSearchQuery}
         category={categoryFilter}
         onCategoryChange={setCategoryFilter}
       />
-      <main className="flex-1 flex flex-col overflow-y-auto bg-background">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-background">
         <div className="p-6 lg:p-8 space-y-6 max-w-5xl">
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -224,7 +241,7 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
             <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-foreground">{formTitle || "Permohonan Pencairan Dana"}</h1>
           </div>
 
-          {feedbackMessage && <div className="flex items-center gap-2 p-3 text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-md"><CheckCircleIcon className="size-4 shrink-0" /><span>{feedbackMessage}</span></div>}
+          {feedbackMessage && <div role="status" className="flex items-center gap-2 p-3 text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-md"><CheckCircleIcon className="size-4 shrink-0" aria-hidden="true" /><span>{feedbackMessage}</span></div>}
 
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Formulir PPD</h2>
@@ -233,7 +250,7 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
 
           {!activeDraft ? (
             <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-              Belum ada draft PPD. Pilih <strong>New draft</strong> untuk membuat permohonan.
+              Belum ada draft PPD. Pilih <strong>Buat baru</strong> untuk membuat permohonan.
             </div>
           ) : (
             <>
@@ -246,11 +263,12 @@ export function PpdForm({ initialData }: { initialData: PpdPageData }) {
                 bank={bank} onBankChange={setBank} accountNo={accountNo} onAccountNoChange={setAccountNo}
                 limitFund={limitFund} onLimitFundChange={setLimitFund}
               />
-              {submissionType === "Uang Muka" && (
+              {submissionType === "UANG_MUKA" && (
                 <PpdReportTable
                   rows={rows} onAdd={handleAddRow} onUpdate={handleUpdateRow} onRemove={handleRemoveRow}
                   total={totalAmount} deptName={departmentName} accounts={filteredAccounts}
                   budgets={initialData.budgets} year={year} month={month}
+                  selectedAccountId={selectedAccountId} onAccountChange={handleAccountChange}
                 />
               )}
               {activeDraft.status === "Draft" && <PpdActionBar

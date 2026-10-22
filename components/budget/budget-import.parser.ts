@@ -3,6 +3,16 @@
 import * as XLSX from "xlsx";
 import type { ParsedBudgetRow, ImportRowError, ImportPreviewRow, ImportRowStatus, BudgetImportPreview } from "./budget-import.types";
 
+type RawCell = string | number | null;
+
+const toRawCell = (value: unknown): RawCell => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" || typeof value === "number") return value;
+  if (typeof value === "boolean") return String(value);
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+};
+
 // Normalisasi nama kolom ke bentuk standar
 const normalizeHeader = (str: string): string => {
   return str
@@ -14,7 +24,7 @@ const normalizeHeader = (str: string): string => {
 };
 
 // Cek apakah string adalah nama bulan valid
-const parseMonth = (value: string | number): number | null => {
+const parseMonth = (value: RawCell): number | null => {
   const months = [
     "januari", "februari", "maret", "april", "mei", "juni",
     "juli", "agustus", "september", "oktober", "november", "desember"
@@ -25,6 +35,7 @@ const parseMonth = (value: string | number): number | null => {
     return null;
   }
   
+  if (typeof value !== "string") return null;
   const lower = value.toLowerCase().trim();
   const idx = months.indexOf(lower);
   if (idx !== -1) return idx + 1;
@@ -37,27 +48,29 @@ const parseMonth = (value: string | number): number | null => {
 };
 
 // Cek apakah string adalah tahun valid
-const parseYear = (value: string | number): number | null => {
+const parseYear = (value: RawCell): number | null => {
   if (typeof value === "number") {
     const y = Math.floor(value);
     if (y >= 1900 && y <= 2100) return y;
     return null;
   }
   
-  const num = parseInt(value.toString().trim(), 10);
+  if (typeof value !== "string") return null;
+  const num = parseInt(value.trim(), 10);
   if (!isNaN(num) && num >= 1900 && num <= 2100) return num;
   
   return null;
 };
 
 // Cek apakah string adalah angka valid
-const parseAmount = (value: string | number): number | null => {
+const parseAmount = (value: RawCell): number | null => {
   if (typeof value === "number") {
     if (isFinite(value) && value >= 0) return Math.floor(value);
     return null;
   }
   
-  const cleaned = value.toString().trim().replace(/[^\d.]/g, "");
+  if (typeof value !== "string") return null;
+  const cleaned = value.trim().replace(/[^\d.]/g, "");
   const num = parseFloat(cleaned);
   if (!isNaN(num) && num >= 0) return Math.floor(num);
   
@@ -91,7 +104,7 @@ const detectColumns = (headers: string[]): Record<string, string> => {
 };
 
 // Validasi baris
-const validateRow = (row: Record<string, any>, mapping: Record<string, string>): ImportRowError[] => {
+const validateRow = (row: Record<string, RawCell> & { __rowNum__: number }, mapping: Record<string, string>): ImportRowError[] => {
   const errors: ImportRowError[] = [];
   
   if ((!mapping.accountName || !row[mapping.accountName]) && (!mapping.accountCode || !row[mapping.accountCode])) {
@@ -138,7 +151,7 @@ export function parseBudgetExcel(file: File): Promise<BudgetImportPreview> {
         const sheet = workbook.Sheets[sheetName];
         
         // Parse ke JSON
-        const json = XLSX.utils.sheet_to_json(sheet, {
+        const json = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
           header: 1,
           defval: null,
           raw: true,
@@ -149,8 +162,8 @@ export function parseBudgetExcel(file: File): Promise<BudgetImportPreview> {
           return;
         }
         
-        const headers = json[0] as string[];
-        const rows = json.slice(1) as any[];
+        const headers = (json[0] ?? []).map((header) => String(header ?? ""));
+        const rows = json.slice(1);
         
         // Deteksi mapping kolom
         const mapping = detectColumns(headers);
@@ -172,9 +185,9 @@ export function parseBudgetExcel(file: File): Promise<BudgetImportPreview> {
         const seenKeys = new Map<string, number>(); // Untuk deteksi duplikat
         
         rows.forEach((rowArr, idx) => {
-          const rowObj: Record<string, any> = { __rowNum__: idx + 2 }; // 1-based, baris ke-2 adalah data pertama
+          const rowObj: Record<string, RawCell> & { __rowNum__: number } = { __rowNum__: idx + 2 }; // 1-based, baris ke-2 adalah data pertama
           headers.forEach((header, hIdx) => {
-            rowObj[header] = rowArr[hIdx] ?? null;
+            rowObj[header] = toRawCell(rowArr[hIdx]);
           });
           
           // Validasi
@@ -182,10 +195,10 @@ export function parseBudgetExcel(file: File): Promise<BudgetImportPreview> {
           const status: ImportRowStatus = errors.length > 0 ? "invalid" : "unmapped";
           
           // Parse nilai
-          const accountName = rowObj[mapping.accountName]?.toString().trim() ?? "";
-          const departmentName = rowObj[mapping.department]?.toString().trim() ?? "";
-          const accountCode = mapping.accountCode ? rowObj[mapping.accountCode]?.toString().trim() : undefined;
-          const departmentCode = mapping.departmentCode ? rowObj[mapping.departmentCode]?.toString().trim() : undefined;
+          const accountName = String(rowObj[mapping.accountName] ?? "").trim();
+          const departmentName = String(rowObj[mapping.department] ?? "").trim();
+          const accountCode = mapping.accountCode ? String(rowObj[mapping.accountCode] ?? "").trim() : undefined;
+          const departmentCode = mapping.departmentCode ? String(rowObj[mapping.departmentCode] ?? "").trim() : undefined;
           const month = parseMonth(rowObj[mapping.month]);
           const year = parseYear(rowObj[mapping.year]);
           const amount = parseAmount(rowObj[mapping.amount]);

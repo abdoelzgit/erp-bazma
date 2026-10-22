@@ -53,8 +53,8 @@ export async function getPpdPageData(): Promise<PpdPageData> {
       accountNo: request.accountNo ?? "",
       limitFund: String(Number(request.totalAmount)),
       status: request.status === "DRAFT" ? "Draft" : "Submitted",
-      year: request.createdAt.getFullYear(),
-      month: request.createdAt.getMonth() + 1,
+      year: request.year,
+      month: request.month,
       updatedAt: request.updatedAt.toISOString(),
       rows: request.items.map((item) => ({
         id: item.id,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Role } from "@/lib/roles";
 import { createUser, updateUser } from "@/app/actions/user";
 import {
@@ -39,19 +39,10 @@ export function UserFormDialog({
 }: UserFormDialogProps) {
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
-  const [role, setRole] = useState<Role>(user?.role || "STAFF");
+  const [role, setRole] = useState<Role>(user?.role ?? Role.STAFF);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    if (!open) return;
-    setName(user?.name ?? "");
-    setEmail(user?.email ?? "");
-    setRole(user?.role ?? Role.STAFF);
-    setPassword("");
-    setError(null);
-  }, [open, mode, user]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

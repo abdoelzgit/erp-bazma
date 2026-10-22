@@ -25,7 +25,7 @@ import { AccountBudgetTable } from "./components/account-budget-table";
 import { BudgetActionsMenu } from "./components/budget-actions-menu";
 import { CreateBudgetDialog } from "./components/budget-dialogs";
 import { BudgetImportDialog } from "./components/budget-import-dialog";
-import type { BudgetImportScope } from "./budget-import.types";
+import type { BudgetImportPreview, BudgetImportScope } from "./budget-import.types";
 
 /* ---------- Helper functions ---------- */
 const pct = (n: number, total: number) =>
@@ -98,18 +98,18 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
     setImportOpen(true);
   };
 
-  const handleImportComplete = async (preview: any) => {
-    const inScopeRows = preview.rows.filter((r: any) => {
-      if (importScope.type === "annual") return r.year === importScope.year;
-      const rowDepartmentCode = String(r.departmentCode ?? "").trim();
-      const rowDepartment = String(r.departmentName).trim().toLowerCase();
+  const handleImportComplete = async (preview: BudgetImportPreview) => {
+    const inScopeRows = preview.rows.filter((row) => {
+      if (importScope.type === "annual") return row.year === importScope.year;
+      const rowDepartmentCode = String(row.departmentCode ?? "").trim();
+      const rowDepartment = String(row.departmentName).trim().toLowerCase();
       const departmentMatches = rowDepartmentCode
         ? rowDepartmentCode.toLowerCase() === importScope.departmentCode.trim().toLowerCase()
         : rowDepartment === importScope.departmentName.trim().toLowerCase();
-      return r.year === importScope.year && r.month === importScope.month && departmentMatches;
+      return row.year === importScope.year && row.month === importScope.month && departmentMatches;
     });
-    const validRows = inScopeRows.filter((row: any) => row.status === "unmapped" || row.status === "new");
-    const mappedRows = validRows.flatMap((row: any) => {
+    const validRows = inScopeRows.filter((row) => row.status === "unmapped" || row.status === "new");
+    const mappedRows = validRows.flatMap((row) => {
       const departmentByCode = row.departmentCode ? departments.find((item) => item.code.trim().toLowerCase() === String(row.departmentCode).trim().toLowerCase()) : undefined;
       const department = departmentByCode
         ?? departments.find((item) => item.name.trim().toLowerCase() === String(row.departmentName).trim().toLowerCase());
@@ -164,7 +164,7 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
   const handleExportBudget = () => {
     const dept = departments.find((d) => d.id === selectedDeptId) ?? departments[0];
     if (!dept) return showFeedback("Tidak ada departemen untuk diekspor.");
-    const data: any[] = [];
+    const data: Record<string, string | number>[] = [];
 
     activeAccounts.filter((acc) => acc.deptId === selectedDeptId).forEach((acc) => {
       const entry = budgets[budgetKey(acc.id, year, month)];
@@ -404,16 +404,16 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
 
   /* ---------- Render ---------- */
   return (
-    <div className="flex flex-col lg:flex-row h-full min-h-[calc(100vh-4rem)] bg-background">
+    <div className="flex min-h-[calc(100svh-4rem)] flex-col bg-background lg:h-svh lg:min-h-0 lg:flex-row">
       {/* ============================================================== */}
       {/* PANEL KIRI: daftar departemen + periode                        */}
       {/* ============================================================== */}
-      <aside className="w-full lg:w-88 border-r bg-muted/20 flex flex-col shrink-0">
-        <div className="p-5 border-b space-y-3.5">
+      <aside className="flex w-full shrink-0 flex-col border-r bg-muted/20 lg:h-full lg:min-h-0 lg:w-88">
+        <div className="shrink-0 space-y-3.5 border-b p-5">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Budget</h1>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">Anggaran</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Kelola budget tiap account per bulan.
+              Kelola anggaran tiap akun per bulan.
             </p>
           </div>
 
@@ -444,10 +444,10 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
           onSelect={(deptId) => { setSelectedDeptId(deptId); resetInteraction(); }}
         />
 
-        <div className="p-3.5 border-t text-xs text-muted-foreground bg-muted/10 space-y-0.5">
+        <div className="shrink-0 border-t bg-muted/10 p-3.5 text-xs text-muted-foreground space-y-0.5">
           <div>Periode {MONTHS[month - 1]} {year}</div>
           <div className="font-bold text-foreground">
-            Total budget semua departemen: {formatRupiah(grandTotal)}
+            Total anggaran semua departemen: {formatRupiah(grandTotal)}
           </div>
         </div>
       </aside>
@@ -455,7 +455,7 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
       {/* ============================================================== */}
       {/* PANEL KANAN: detail budget departemen terpilih                 */}
       {/* ============================================================== */}
-      <main className="flex-1 flex flex-col overflow-y-auto bg-background">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-background">
         <div className="p-6 lg:p-8 space-y-6 max-w-5xl">
           {/* Judul */}
           <div className="space-y-1">
@@ -503,9 +503,9 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
           <div className="rounded-lg border bg-card p-5 space-y-5 shadow-xs">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-semibold text-sm">Ringkasan budget</h2>
+                <h2 className="font-semibold text-sm">Ringkasan anggaran</h2>
                 <p className="text-xs text-muted-foreground">
-                  Jumlah dari seluruh account {activeDept.name} bulan ini
+                  Jumlah seluruh akun {activeDept.name} bulan ini
                 </p>
               </div>
               <Badge variant="outline" className="text-xs font-normal">
@@ -515,7 +515,7 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 rounded-lg bg-muted/40 border">
-                <div className="text-xs text-muted-foreground">Total budget</div>
+                <div className="text-xs text-muted-foreground">Total anggaran</div>
                 <div className="text-xl lg:text-2xl font-bold tracking-tight text-foreground mt-1 font-mono">
                   {formatRupiah(totals.amount)}
                 </div>
@@ -540,7 +540,7 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Pemakaian {usedPct}% dari total budget</span>
+                <span>Pemakaian {usedPct}% dari total anggaran</span>
                 <span>
                   1 – {lastDay} {MONTHS[month - 1]} {year}
                 </span>
@@ -558,7 +558,7 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
             </div>
 
             <div className="text-[11px] text-muted-foreground border-t pt-3">
-              Sisa sudah dikurangi dana yang sedang ditahan pengajuan berjalan (
+              Sisa sudah dikurangi dana yang sedang ditahan oleh pengajuan berjalan (
               {formatRupiah(totals.draf)}). Realisasi hanya bertambah saat pengajuan dibayar.
             </div>
           </div>
@@ -567,9 +567,9 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
           <div className="rounded-lg border bg-card p-5 space-y-4 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="font-semibold text-sm">Budget per account</h2>
+                <h2 className="font-semibold text-sm">Anggaran per akun</h2>
                 <p className="text-xs text-muted-foreground">
-                  Budget diatur per account dan per bulan
+                  Anggaran diatur per akun dan per bulan
                 </p>
               </div>
               <BudgetActionsMenu
@@ -584,10 +584,10 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
             <div className="relative">
               <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
               <Input
-                placeholder="Cari nama atau kode account..."
+                placeholder="Cari nama atau kode akun..."
                 value={accSearch}
                 onChange={(e) => setAccSearch(e.target.value)}
-                aria-label="Cari account"
+                aria-label="Cari akun anggaran"
                 className="h-8 text-xs bg-background pl-8"
               />
             </div>
@@ -602,7 +602,7 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
             />
 
             <p className="text-[11px] text-muted-foreground">
-              Pengajuan (PPD) hanya bisa memakai account yang sudah punya budget pada bulan pengajuan.
+              Pengajuan (PPD) hanya bisa memakai akun yang sudah memiliki anggaran pada bulan pengajuan.
             </p>
           </div>
 
@@ -610,9 +610,9 @@ export function BudgetView({ initialData, canManage }: { initialData: BudgetPage
           <div className="rounded-lg border bg-card p-5 space-y-4 shadow-xs">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-semibold text-sm">Draf log</h2>
+                <h2 className="font-semibold text-sm">Dana tertahan</h2>
                 <p className="text-xs text-muted-foreground">
-                  Riwayat dana ditahan oleh pengajuan {activeDept.name} bulan ini
+                  Rincian dana yang ditahan oleh pengajuan {activeDept.name} bulan ini
                 </p>
               </div>
               <Badge variant="outline" className="text-xs font-normal">

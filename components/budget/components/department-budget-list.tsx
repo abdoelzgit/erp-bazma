@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { DepartmentSummary } from "../budget-view.types";
 import { formatRupiah } from "@/lib/utils";
 
@@ -16,21 +17,19 @@ export function DepartmentBudgetList({
   onSelect,
 }: DepartmentBudgetListProps) {
   return (
-    <div className="flex-1 overflow-y-auto divide-y divide-border/60">
-      {summaries.map(({ dept, accountCount, missing, total }) => {
+    <ScrollArea className="min-h-0 flex-1 overscroll-contain">
+      <div className="divide-y divide-border/60">
+        {summaries.map(({ dept, accountCount, missing, total }) => {
         const isSelected = dept.id === selectedDeptId;
         return (
-          <div
+          <button
+            type="button"
             key={dept.id}
-            role="button"
-            tabIndex={0}
             onClick={() => onSelect(dept.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onSelect(dept.id);
-            }}
-            className={`p-4 transition-colors cursor-pointer relative ${
+            aria-pressed={isSelected}
+            className={`relative block w-full p-4 text-left transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
               isSelected
-                ? "bg-accent/80 border-l-4 border-l-primary text-accent-foreground"
+                ? "bg-accent/80 text-accent-foreground"
                 : "hover:bg-muted/50"
             }`}
           >
@@ -65,15 +64,16 @@ export function DepartmentBudgetList({
                 {isSelected ? "Dipilih" : "Lihat detail →"}
               </span>
             </div>
-          </div>
+          </button>
         );
-      })}
+        })}
 
-      {summaries.length === 0 && (
-        <div className="p-8 text-center text-xs text-muted-foreground">
-          Tidak ada departemen yang sesuai pencarian.
-        </div>
-      )}
-    </div>
+        {summaries.length === 0 && (
+          <div className="p-8 text-center text-xs text-muted-foreground">
+            Tidak ada departemen yang sesuai pencarian.
+          </div>
+        )}
+      </div>
+    </ScrollArea>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
-import { PlusIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Department } from "../department-view.types";
 
 export type DepartmentSidebarProps = {
@@ -36,10 +37,10 @@ export function DepartmentSidebar({
   onYearChange,
 }: DepartmentSidebarProps) {
   return (
-    <aside className="w-full lg:w-88 border-r bg-muted/20 flex flex-col shrink-0">
-      <div className="p-5 border-b space-y-3.5">
+    <aside className="flex w-full shrink-0 flex-col border-r bg-muted/20 lg:h-full lg:min-h-0 lg:w-88">
+      <div className="shrink-0 space-y-3.5 border-b p-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Departemen</h1>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Departemen</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             Kelola data, anggaran, dan anggota.
           </p>
@@ -60,7 +61,7 @@ export function DepartmentSidebar({
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="space-y-1">
             <label htmlFor="dept-status-filter" className="text-[11px] font-medium text-muted-foreground">Status</label>
-            <select id="dept-status-filter" value={status} onChange={(e) => onStatusChange(e.target.value)} className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs focus:outline-none">
+            <select id="dept-status-filter" value={status} onChange={(e) => onStatusChange(e.target.value)} className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
               <option value="Semua">Semua</option>
               <option value="Aktif">Aktif</option>
               <option value="Nonaktif">Nonaktif</option>
@@ -69,7 +70,7 @@ export function DepartmentSidebar({
 
           <div className="space-y-1">
             <label htmlFor="dept-year-filter" className="text-[11px] font-medium text-muted-foreground">Tahun anggaran</label>
-            <select id="dept-year-filter" value={year} onChange={(e) => onYearChange(e.target.value)} className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs focus:outline-none">
+            <select id="dept-year-filter" value={year} onChange={(e) => onYearChange(e.target.value)} className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
               <option value={String(new Date().getFullYear())}>{new Date().getFullYear()}</option>
               <option value={String(new Date().getFullYear() - 1)}>{new Date().getFullYear() - 1}</option>
               <option value="Semua">Semua</option>
@@ -82,14 +83,17 @@ export function DepartmentSidebar({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto divide-y divide-border/60">
-        {departments.map((dept) => {
+      <ScrollArea className="min-h-0 flex-1 overscroll-contain">
+        <div className="divide-y divide-border/60">
+          {departments.map((dept) => {
           const isSelected = dept.id === selectedDeptId;
           return (
-            <div
+            <button
+              type="button"
               key={dept.id}
               onClick={() => onSelect(dept.id)}
-              className={`p-4 transition-colors cursor-pointer relative ${isSelected ? "bg-accent/80 border-l-4 border-l-primary text-accent-foreground" : "hover:bg-muted/50"}`}
+              aria-pressed={isSelected}
+              className={`relative block w-full p-4 text-left transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${isSelected ? "bg-accent/80 text-accent-foreground" : "hover:bg-muted/50"}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <h3 className="font-bold text-sm leading-tight text-foreground">{dept.name}</h3>
@@ -108,18 +112,19 @@ export function DepartmentSidebar({
                   {isSelected ? "Dipilih" : "Lihat detail →"}
                 </span>
               </div>
-            </div>
+            </button>
           );
-        })}
+          })}
 
-        {departments.length === 0 && (
-          <div className="p-8 text-center text-xs text-muted-foreground">
-            {emptyMessage}
-          </div>
-        )}
-      </div>
+          {departments.length === 0 && (
+            <div className="p-8 text-center text-xs text-muted-foreground">
+              {emptyMessage}
+            </div>
+          )}
+        </div>
+      </ScrollArea>
 
-      <div className="p-3.5 border-t text-xs text-muted-foreground bg-muted/10 space-y-0.5">
+      <div className="shrink-0 border-t bg-muted/10 p-3.5 text-xs text-muted-foreground space-y-0.5">
         {/* Will be filled by parent */}
       </div>
     </aside>

@@ -267,7 +267,8 @@ export async function addDepartmentMemberAction(input: {
         throw new Error("Dept Head hanya dapat menambahkan pengguna ber-role Staff.");
       }
 
-      const departmentRole = user.role === Role.DEPT_HEAD ? "PIC" : "MEMBER";
+      const departmentRole: "PIC" | "MEMBER" =
+        user.role === Role.DEPT_HEAD ? "PIC" : "MEMBER";
       const name = user.name?.trim() || user.email;
       const email = user.email.toLowerCase();
       const existingMembership = await tx.departmentMember.findUnique({

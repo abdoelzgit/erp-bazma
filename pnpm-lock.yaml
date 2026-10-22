@@ -13,7 +13,7 @@ importers:
         version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@hookform/resolvers':
         specifier: ^6.0.0
-        version: 6.0.0(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.90.0(@types/react@19.3.0)(react@19.3.0))(zod@4.6.7)
+        version: 6.0.0(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(arktype@2.2.8)(effect@4.0.3)(react-hook-form@7.90.0(@types/react@19.3.0)(react@19.3.0))(typanion@3.14.0)(valibot@1.2.0(typescript@5.9.3))(zod@4.6.7)
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -82,7 +82,7 @@ importers:
         specifier: 16.4.0
         version: 16.4.0(@typescript-eslint/parser@8.71.1(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       prisma:
-        specifier: ^6.4.0
+        specifier: ^6.19.3
         version: 6.19.3(typescript@5.9.3)
       tailwindcss:
         specifier: ^4
@@ -99,6 +99,12 @@ packages:
   '@alloc/quick-lru@5.3.0':
     resolution: {integrity: sha512-U4+70Pc5ZS9osnCBCE5Jha/ciHM+Yp+CNMNC/7HvYbNRk1Ldd+f7qO65W5qfhu/TCv+/ozljlXXe9Nj8419DMA==}
     engines: {node: '>=10'}
+
+  '@ark/schema@0.56.7':
+    resolution: {integrity: sha512-jmoOJlYIc4k1uv8oYBDNOFnAsKk2a2D9t/D6npF2JUfW4ecPB0v6ce6lruKg7lkBxIBA8Z7UtxfmvephYbhUGQ==}
+
+  '@ark/util@0.56.7':
+    resolution: {integrity: sha512-z8pVnrPk/x9GC18yOp5wCe8rR2+Z6us4CTSg7dvxdsDLuA2xXYq+QETD1fO6f3fMuXe+PCjpvtCnhTW9RHLgEw==}
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -1292,6 +1298,12 @@ packages:
     resolution: {integrity: sha512-COROpnaoap1E2F000S62r6A60uHZnmlvomhfyT2DlTcrY1OrBKn2UhH7qn5wTC9zMvD0AY7csdPSNwKP+7WiQw==}
     engines: {node: '>= 0.4'}
 
+  arkregex@0.0.13:
+    resolution: {integrity: sha512-c17sqCqiiZauxyoU1KZ2zbzCgeghGmc8dR2CrdQnlEtpq3bLhRLoLrxTL52M/8yQD8e/i1/IBRpRCNAuqJa7xQ==}
+
+  arktype@2.2.8:
+    resolution: {integrity: sha512-tZyLza7kO2vN8BXBKcj4t43IVMe8/ZyqlITH0chZv7FfEw+edLovpY922tqcK4mCjTpf4oNo2xV6np7tquP1ww==}
+
   array-buffer-byte-length@1.0.2:
     resolution: {integrity: sha512-LHE+8BuR7RYGDKvnrmcuSq3tDcKv9OFEXQt/HpbZhY7V6h0zlUXutnAD82GiFx9rdieCMjkvtcsPqBwgUl1Iiw==}
     engines: {node: '>= 0.4'}
@@ -1677,6 +1689,9 @@ packages:
 
   effect@3.21.0:
     resolution: {integrity: sha512-PPN80qRokCd1f015IANNhrwOnLO7GrrMQfk4/lnZRE/8j7UPWrNNjPV0uBrZutI/nHzernbW+J0hdqQysHiSnQ==}
+
+  effect@4.0.3:
+    resolution: {integrity: sha512-LoWn/Uwwx0JjHSDmBAAahx8sB+klzM6vsZovnbYowBNw6B4QScJLRLBByO61plvNiycx7HPN8FnsWUCu0eXW5w==}
 
   electron-to-chromium@1.5.452:
     resolution: {integrity: sha512-cVvk1YBSj6571VmV6hdJTqj94Y79xSu8cj6Y9t6ae4Y4431z8/7EJFvu3rVp90xhfuv9BpPKUmaLfTo4+FOGBg==}
@@ -3233,6 +3248,9 @@ packages:
   tw-animate-css@1.4.0:
     resolution: {integrity: sha512-7bziOlRqH0hJx80h/3mbicLW7o8qLsH5+RaLR2t+OHM3D0JlWGODQKQ4cxbK7WlvmUxpcj6Kgu6EKqjrGFe3QQ==}
 
+  typanion@3.14.0:
+    resolution: {integrity: sha512-ZW/lVMRabETuYCd9O9ZvMhAh8GslSqaUjxmK/JLPCh6l73CvLBiuXswj/+7LdnWOgYsQ130FqLzFz5aGT4I3Ug==}
+
   type-check@0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
     engines: {node: '>= 0.8.0'}
@@ -3315,6 +3333,14 @@ packages:
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
+
+  valibot@1.2.0:
+    resolution: {integrity: sha512-mm1rxUsmOxzrwnX5arGS+U4T25RdvpPjPN4yR0u9pUBov9+zGVtO84tif1eY4r6zWxVxu3KzIyknJy3rxfRZZg==}
+    peerDependencies:
+      typescript: '>=5'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   validate-npm-package-name@7.0.2:
     resolution: {integrity: sha512-hVDIBwsRruT73PbK7uP5ebUt+ezEtCmzZz3F59BSr2F6OVFnJ/6h8liuvdLrQ88Xmnk6/+xGGuq+pG9WwTuy3A==}
@@ -3409,6 +3435,14 @@ packages:
 snapshots:
 
   '@alloc/quick-lru@5.3.0': {}
+
+  '@ark/schema@0.56.7':
+    dependencies:
+      '@ark/util': 0.56.7
+    optional: true
+
+  '@ark/util@0.56.7':
+    optional: true
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -3813,7 +3847,7 @@ snapshots:
     dependencies:
       hono: 4.13.13
 
-  '@hookform/resolvers@6.0.0(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.90.0(@types/react@19.3.0)(react@19.3.0))(zod@4.6.7)':
+  '@hookform/resolvers@6.0.0(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(arktype@2.2.8)(effect@4.0.3)(react-hook-form@7.90.0(@types/react@19.3.0)(react@19.3.0))(typanion@3.14.0)(valibot@1.2.0(typescript@5.9.3))(zod@4.6.7)':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.90.0(@types/react@19.3.0)(react@19.3.0)
@@ -3821,6 +3855,10 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       ajv: 8.20.0
       ajv-formats: 2.1.1(ajv@8.20.0)
+      arktype: 2.2.8
+      effect: 4.0.3
+      typanion: 3.14.0
+      valibot: 1.2.0(typescript@5.9.3)
       zod: 4.6.7
 
   '@humanfs/core@0.19.2':
@@ -4440,6 +4478,18 @@ snapshots:
 
   aria-query@5.3.2: {}
 
+  arkregex@0.0.13:
+    dependencies:
+      '@ark/util': 0.56.7
+    optional: true
+
+  arktype@2.2.8:
+    dependencies:
+      '@ark/schema': 0.56.7
+      '@ark/util': 0.56.7
+      arkregex: 0.0.13
+    optional: true
+
   array-buffer-byte-length@1.0.2:
     dependencies:
       call-bound: 1.0.4
@@ -4815,6 +4865,9 @@ snapshots:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
+
+  effect@4.0.3:
+    optional: true
 
   electron-to-chromium@1.5.452: {}
 
@@ -6621,6 +6674,9 @@ snapshots:
 
   tw-animate-css@1.4.0: {}
 
+  typanion@3.14.0:
+    optional: true
+
   type-check@0.4.0:
     dependencies:
       prelude-ls: 1.2.1
@@ -6737,6 +6793,11 @@ snapshots:
       react: 19.3.0
 
   util-deprecate@1.0.2: {}
+
+  valibot@1.2.0(typescript@5.9.3):
+    optionalDependencies:
+      typescript: 5.9.3
+    optional: true
 
   validate-npm-package-name@7.0.2: {}
 

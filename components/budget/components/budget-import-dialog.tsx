@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   FileTextIcon,
   UploadSimpleIcon,
-  CheckIcon,
   XIcon,
   WarningCircleIcon,
   SpinnerGapIcon,
@@ -44,8 +43,15 @@ export function BudgetImportDialog({
   const [error, setError] = useState<string | null>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Ukuran file maksimal 10 MB.");
+      input.value = "";
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
@@ -54,10 +60,11 @@ export function BudgetImportDialog({
       const result = await parseBudgetExcel(file);
       setPreview(result);
       setStep("preview");
-    } catch (err: any) {
-      setError(err.message || "Gagal memproses file Excel");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Gagal memproses file Excel");
     } finally {
       setIsLoading(false);
+      input.value = "";
     }
   };
 
@@ -89,13 +96,13 @@ export function BudgetImportDialog({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className={cn(
-        "transition-all duration-300",
-        step === "upload" ? "max-w-md" : "max-w-4xl max-h-[90vh]"
+        "max-h-[90svh] overflow-y-auto overscroll-contain transition-all duration-300",
+        step === "upload" ? "max-w-md" : "max-w-4xl"
       )}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileTextIcon className="w-5 h-5 text-green-600" />
-            {step === "upload" ? "Import Anggaran" : "Preview Import"}
+            {step === "upload" ? "Impor anggaran" : "Pratinjau impor"}
           </DialogTitle>
           <DialogDescription>
             {step === "upload"
@@ -110,7 +117,7 @@ export function BudgetImportDialog({
           <div className="space-y-4 py-4">
             <div
               className={cn(
-                "border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center gap-4 transition-colors",
+                "relative flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-8 transition-colors focus-within:ring-2 focus-within:ring-ring sm:p-12",
                 isLoading ? "bg-muted animate-pulse" : "hover:bg-muted/50 border-muted-foreground/25"
               )}
             >
@@ -121,15 +128,17 @@ export function BudgetImportDialog({
               )}
               <div className="text-center">
                 <p className="font-medium">
-                  {isLoading ? "Memproses file..." : "Klik atau seret file ke sini"}
+                  {isLoading ? "Memproses file..." : "Pilih file Excel untuk diunggah"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Excel (.xlsx, .xls) max 10MB
+                  Excel (.xlsx, .xls), ukuran maks. 10 MB
                 </p>
               </div>
               <input
+                id="budget-import-file"
                 type="file"
-                className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                aria-label="Pilih file anggaran Excel"
+                className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
                 accept=".xlsx, .xls"
                 onChange={handleFileUpload}
                 disabled={isLoading}
@@ -137,18 +146,18 @@ export function BudgetImportDialog({
             </div>
 
             {error && (
-              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex gap-3 text-sm text-destructive">
+              <div role="alert" className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex gap-3 text-sm text-destructive">
                 <WarningCircleIcon className="w-4 h-4 shrink-0 mt-0.5" />
                 <p>{error}</p>
               </div>
             )}
 
-            <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg space-y-2">
-              <div className="flex items-center gap-2 text-blue-700 font-medium text-sm">
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-primary font-medium text-sm">
                 <InfoIcon className="w-4 h-4" />
                 Ketentuan Kolom:
               </div>
-              <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside ml-1">
+              <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside ml-1">
                 <li>Harus memiliki header (Baris 1)</li>
                 <li>Kolom wajib: Nama Anggaran, Departemen, Bulan, Tahun, Nominal</li>
                 <li>Nama bulan bisa teks (Januari) atau angka (1-12)</li>
@@ -158,7 +167,7 @@ export function BudgetImportDialog({
         ) : (
           <div className="space-y-6 py-4">
             {/* Summary Cards */}
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <SummaryCard
                 label="Total"
                 value={preview?.totalRows || 0}
@@ -166,7 +175,7 @@ export function BudgetImportDialog({
                 color="blue"
               />
               <SummaryCard
-                label="Siap Import"
+                label="Siap diimpor"
                 value={preview?.summary.unmapped || 0}
                 icon={CheckCircleIcon}
                 color="green"
@@ -186,14 +195,14 @@ export function BudgetImportDialog({
             </div>
 
             {/* Success message */}
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-              <p className="font-medium">Data siap diimport</p>
-              <p className="text-xs mt-1 text-green-600">
+            <div role="status" className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-800 dark:text-emerald-300">
+              <p className="font-medium">Data siap diimpor</p>
+              <p className="text-xs mt-1 text-emerald-700 dark:text-emerald-400">
                 {inScopeCount} baris sesuai cakupan import.
               </p>
             </div>
             {outOfScopeCount > 0 && (
-              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+              <div role="status" className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs">
                 {outOfScopeCount} baris berada di luar cakupan dan akan dilewati.
               </div>
             )}
@@ -202,14 +211,14 @@ export function BudgetImportDialog({
 
         <DialogFooter className={step === "upload" ? "hidden" : "flex"}>
           <Button variant="outline" onClick={() => setStep("upload")}>
-            Ganti File
+            Ganti file
           </Button>
           <Button
             onClick={handleConfirmImport}
             disabled={!preview || preview.summary.invalid > 0 || inScopeCount === 0}
             className="bg-green-600 hover:bg-green-700 text-white"
           >
-            Import {preview?.summary.unmapped} Data
+            Impor {preview?.summary.unmapped} data
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -217,18 +226,30 @@ export function BudgetImportDialog({
   );
 }
 
-function SummaryCard({ label, value, icon: Icon, color }: any) {
-  const colors: any = {
-    blue: "bg-blue-50 border-blue-100 text-blue-700",
-    green: "bg-green-50 border-green-100 text-green-700",
-    yellow: "bg-yellow-50 border-yellow-100 text-yellow-700",
-    red: "bg-red-50 border-red-100 text-red-700",
+type SummaryColor = "blue" | "green" | "yellow" | "red";
+
+function SummaryCard({
+  label,
+  value,
+  icon: Icon,
+  color,
+}: {
+  label: string;
+  value: number;
+  icon: React.ElementType;
+  color: SummaryColor;
+}) {
+  const colors: Record<SummaryColor, string> = {
+    blue: "bg-sky-500/10 border-sky-500/20 text-sky-800 dark:text-sky-300",
+    green: "bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300",
+    yellow: "bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-300",
+    red: "bg-destructive/10 border-destructive/20 text-destructive",
   };
 
   return (
     <div className={cn("p-4 rounded-xl border flex items-center gap-4", colors[color])}>
       <div className="p-2 rounded-lg bg-white/50">
-        <Icon className="w-5 h-5" />
+        <Icon className="w-5 h-5" aria-hidden="true" />
       </div>
       <div>
         <p className="text-xs font-medium opacity-80">{label}</p>

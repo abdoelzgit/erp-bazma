@@ -109,13 +109,15 @@ export function UsersManagementClient({ currentUserId, initialUsers, loadError }
         </table>
       </div>
 
-      <UserFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        mode={formMode}
-        user={selectedUser || undefined}
-        onSuccess={handleSuccess}
-      />
+      {formOpen && (
+        <UserFormDialog
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          mode={formMode}
+          user={selectedUser || undefined}
+          onSuccess={handleSuccess}
+        />
+      )}
 
       {selectedUser && (
         <UserDeleteDialog

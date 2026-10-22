@@ -2,6 +2,14 @@
 
 import { XIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -50,40 +58,44 @@ export function CreateBudgetDialog({
   onAmountChange,
   onErrorChange,
 }: CreateBudgetDialogProps) {
-  if (!open) return null;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await onSubmit(selectedDeptId, selectedAccountName, accountCode, Number(amount));
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
-      onKeyDown={(e) => e.key === "Escape" && onClose()}
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-title"
-        className="bg-card border rounded-lg max-w-md w-full p-6 shadow-xl space-y-4"
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[calc(100svh-2rem)] overflow-y-auto overscroll-contain rounded-lg bg-card p-6 shadow-xl"
       >
-        <div className="flex items-center justify-between border-b pb-3">
-          <div>
-            <h3 id="create-title" className="font-semibold text-base">Tambah account dan budget</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
+        <DialogHeader className="flex-row items-center justify-between border-b pb-3">
+          <div className="min-w-0">
+            <DialogTitle className="font-sans text-base font-semibold normal-case tracking-normal">
+              Tambah account dan budget
+            </DialogTitle>
+            <DialogDescription className="mt-1 text-xs">
               Periode {MONTHS[month - 1]} {year}
-            </p>
+            </DialogDescription>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Tutup"
-            className="text-muted-foreground hover:text-foreground"
+          <DialogClose
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Tutup dialog tambah anggaran"
+              />
+            }
           >
-            <XIcon className="size-4" />
-          </button>
-        </div>
+            <XIcon aria-hidden="true" />
+          </DialogClose>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           <div className="space-y-1">
@@ -146,7 +158,7 @@ export function CreateBudgetDialog({
           </div>
 
           {error && (
-            <div className="p-2.5 rounded bg-destructive/10 border border-destructive/20 text-destructive text-[11px] flex items-center gap-1.5">
+            <div role="alert" className="p-2.5 rounded bg-destructive/10 border border-destructive/20 text-destructive text-[11px] flex items-center gap-1.5">
               <WarningCircleIcon className="size-3.5 shrink-0" />
               <span>{error}</span>
             </div>
@@ -159,7 +171,7 @@ export function CreateBudgetDialog({
             <Button type="submit" size="sm">Buat account dan budget</Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

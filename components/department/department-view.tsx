@@ -249,7 +249,7 @@ export function DepartmentView({ initialDepartments, userOptions, canManageDepar
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-full min-h-[calc(100vh-4rem)] bg-background">
+    <div className="flex min-h-[calc(100svh-4rem)] flex-col bg-background lg:h-svh lg:min-h-0 lg:flex-row">
       <DepartmentSidebar
         departments={filteredDepartments}
         selectedDeptId={selectedDeptId}
@@ -267,7 +267,7 @@ export function DepartmentView({ initialDepartments, userOptions, canManageDepar
         onYearChange={handleYearChange}
       />
 
-      <main className="flex-1 flex flex-col overflow-y-auto bg-background">
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-background">
         {activeDept ? (
           <div className="p-6 lg:p-8 space-y-6 max-w-5xl">
             <div className="space-y-1">

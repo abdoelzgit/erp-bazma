@@ -4,7 +4,7 @@ import { PlusIcon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import type { Department, Member } from "../department-view.types";
+import type { Department } from "../department-view.types";
 import { ROLE_LABELS } from "@/lib/roles";
 
 export type DepartmentMembersCardProps = {
@@ -61,6 +61,7 @@ export function DepartmentMembersCard({
       <div className="flex flex-col sm:flex-row items-center gap-2">
         <div className="relative flex-1 w-full">
           <Input
+            aria-label="Cari anggota departemen"
             placeholder="Cari nama atau email..."
             value={memberSearch}
             onChange={(e) => onMemberSearchChange(e.target.value)}
@@ -69,9 +70,10 @@ export function DepartmentMembersCard({
         </div>
 
         <select
+          aria-label="Filter anggota berdasarkan peran"
           value={memberRoleFilter}
           onChange={(e) => onMemberRoleFilterChange(e.target.value)}
-          className="h-8 px-2 rounded-md border border-input bg-background text-xs w-full sm:w-36 focus:outline-none"
+          className="h-9 px-2 rounded-md border border-input bg-background text-xs w-full sm:w-36 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <option value="Semua">Semua peran</option>
           <option value="Penanggung jawab">Penanggung jawab</option>
