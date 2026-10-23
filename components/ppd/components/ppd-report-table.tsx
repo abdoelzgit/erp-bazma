@@ -65,6 +65,7 @@ export type PpdReportTableProps = {
   accounts: Array<{ id: string; deptId: string; code: string; name: string }>;
   selectedAccountId: string;
   onAccountChange: (accountId: string) => void;
+  readOnly?: boolean;
 };
 
 function ReportCard({ children }: { children: ReactNode }) {
@@ -103,6 +104,7 @@ export function PpdReportTable({
   accounts,
   selectedAccountId,
   onAccountChange,
+  readOnly = false,
 }: PpdReportTableProps) {
   const [page, setPage] = useState(0);
   const [uploadingRows, setUploadingRows] = useState<string[]>([]);
@@ -140,6 +142,7 @@ export function PpdReportTable({
       placeholder="Judul laporan"
       value={row.title}
       onChange={(e) => onUpdate(row.id, "title", e.target.value)}
+      disabled={readOnly}
       className="h-9 text-xs"
     />
   );
@@ -151,6 +154,7 @@ export function PpdReportTable({
       placeholder="Deskripsi item"
       value={row.description}
       onChange={(e) => onUpdate(row.id, "description", e.target.value)}
+      disabled={readOnly}
       className="h-9 text-xs"
     />
   );
@@ -170,7 +174,7 @@ export function PpdReportTable({
             accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
             aria-label={`Pilih lampiran untuk item ${index}`}
             className="sr-only"
-            disabled={isUploading}
+            disabled={isUploading || readOnly}
             onChange={(event) => {
               const file = event.currentTarget.files?.[0];
               event.currentTarget.value = "";
@@ -204,7 +208,7 @@ export function PpdReportTable({
             variant="outline"
             size="xs"
             className="h-8 shrink-0 gap-1.5 px-2 xl:w-8 xl:px-0"
-            disabled={isUploading}
+            disabled={isUploading || readOnly}
             onClick={() => document.getElementById(fileInputId)?.click()}
             aria-label={`Unggah lampiran untuk item ${index}`}
           >
@@ -254,6 +258,7 @@ export function PpdReportTable({
         placeholder="0"
         value={row.amount || ""}
         onChange={(e) => onUpdate(row.id, "amount", Number(e.target.value))}
+        disabled={readOnly}
         className={amountInputClass}
       />
     </div>
@@ -265,6 +270,7 @@ export function PpdReportTable({
       variant="ghost"
       size="icon"
       onClick={() => onRemove(row.id)}
+      disabled={readOnly}
       className="size-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
       aria-label={`Hapus item ${index}`}
     >
@@ -283,6 +289,7 @@ export function PpdReportTable({
             </Label>
             <Select
               value={selectedAccountId}
+              disabled={readOnly}
               onValueChange={(value) => {
                 if (!value) return;
                 setPage(0);
@@ -373,7 +380,7 @@ export function PpdReportTable({
             setPage(Math.floor(rows.length / PAGE_SIZE));
             onAdd();
           }}
-          disabled={accounts.length === 0}
+          disabled={accounts.length === 0 || readOnly}
           className="h-9 gap-1.5 text-xs"
         >
           <PlusIcon className="size-3.5" />

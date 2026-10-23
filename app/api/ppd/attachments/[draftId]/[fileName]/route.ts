@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { canUserCreatePpdInDepartment } from "@/lib/ppd-access";
+import { canReadPpdRequest } from "@/lib/ppd-read-access";
 import { getCurrentUser } from "@/lib/session";
 import { PPD_ATTACHMENT_DIRECTORY, PPD_ATTACHMENT_TYPES } from "@/lib/ppd-attachments";
 
@@ -25,16 +25,8 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const draft = await prisma.pPDRequest.findUnique({
-    where: { id: draftId },
-    select: { id: true, requestedById: true, departmentId: true },
-  });
-  if (!draft) return new NextResponse("Not found", { status: 404 });
-
-  const hasDepartmentAccess = await canUserCreatePpdInDepartment(user.id, draft.departmentId);
-  if (draft.requestedById !== user.id && !hasDepartmentAccess) {
-    return new NextResponse("Not found", { status: 404 });
-  }
+  const draft = await prisma.pPDRequest.findUnique({ where: { id: draftId }, select: { id: true } });
+  if (!draft || !(await canReadPpdRequest(user.id, draft.id))) return new NextResponse("Not found", { status: 404 });
 
   const extension = extname(fileName).toLowerCase();
   const contentType = mimeByExtension[extension];

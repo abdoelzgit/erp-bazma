@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   }
 
   const draft = await prisma.pPDRequest.findFirst({
-    where: { id: draftId, requestedById: user.id, status: "DRAFT" },
+    where: { id: draftId, requestedById: user.id, status: { in: ["DRAFT", "RETURNED_FOR_REVISION"] } },
     select: { id: true, departmentId: true },
   });
   if (!draft || !(await canUserCreatePpdInDepartment(user.id, draft.departmentId))) {

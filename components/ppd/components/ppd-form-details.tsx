@@ -29,6 +29,7 @@ export type PpdFormDetailsProps = {
   onAccountNoChange: (v: string) => void;
   limitFund: string;
   onLimitFundChange: (v: string) => void;
+  disabled?: boolean;
 };
 
 type Option = { value: string; label: string };
@@ -94,16 +95,19 @@ function OptionSelect({
   onChange,
   options,
   placeholder,
+  disabled,
 }: {
   id: string;
   value: string;
   onChange: (v: string) => void;
   options: Option[];
   placeholder: string;
+  disabled?: boolean;
 }) {
   return (
     <Select
       value={value}
+      disabled={disabled}
       onValueChange={(v) => v && onChange(v)}
       items={options}
     >
@@ -139,6 +143,7 @@ export function PpdFormDetails({
   onAccountNoChange,
   limitFund,
   onLimitFundChange,
+  disabled = false,
 }: PpdFormDetailsProps) {
   const deptOptions: Option[] = departments.map((d) => ({
     value: d.id,
@@ -152,6 +157,7 @@ export function PpdFormDetails({
           <Input
             id="p-title"
             value={title}
+            disabled={disabled}
             onChange={(e) => onTitleChange(e.target.value)}
             className="h-10 text-sm"
           />
@@ -161,6 +167,7 @@ export function PpdFormDetails({
           <Textarea
             id="p-desc"
             value={description}
+            disabled={disabled}
             onChange={(e) => onDescriptionChange(e.target.value)}
             rows={3}
             className="resize-none text-sm"
@@ -174,6 +181,7 @@ export function PpdFormDetails({
             onChange={onDeptIdChange}
             options={deptOptions}
             placeholder="Pilih departemen"
+            disabled={disabled}
           />
         </Field>
 
@@ -184,6 +192,7 @@ export function PpdFormDetails({
             onChange={onSubmissionTypeChange}
             options={SUBMISSION_TYPES}
             placeholder="Pilih jenis pengajuan"
+            disabled={disabled}
           />
         </Field>
       </Section>
@@ -196,6 +205,7 @@ export function PpdFormDetails({
             onChange={onPaymentTypeChange}
             options={PAYMENT_TYPES}
             placeholder="Pilih tipe pembayaran"
+            disabled={disabled}
           />
         </Field>
 
@@ -206,6 +216,7 @@ export function PpdFormDetails({
             onChange={onBankChange}
             options={BANKS}
             placeholder="Pilih bank"
+            disabled={disabled}
           />
         </Field>
 
@@ -214,6 +225,7 @@ export function PpdFormDetails({
             id="p-acc"
             inputMode="numeric"
             value={accountNo}
+            disabled={disabled}
             onChange={(e) => onAccountNoChange(e.target.value)}
             className="h-10 font-mono text-sm"
           />
@@ -224,6 +236,7 @@ export function PpdFormDetails({
             id="p-limit"
             inputMode="numeric"
             value={limitFund}
+            disabled={disabled}
             onChange={(e) => onLimitFundChange(e.target.value)}
             className="h-10 text-sm font-medium"
           />

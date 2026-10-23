@@ -7,6 +7,209 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id                    String             @id @default(cuid())
+  name                  String?
+  email                 String             @unique
+  createdAt             DateTime           @default(now())
+  password              String
+  role                  Role               @default(STAFF)
+  updatedAt             DateTime           @updatedAt
+  departmentMemberships DepartmentMember[]
+  ppdApprovalEvents     PPDApprovalEvent[]
+  ppdComments           PPDComment[]
+  ppdPaymentProofs      PPDPaymentProof[]
+  ppdRequests           PPDRequest[]
+
+  @@map("users")
+}
+
+model Department {
+  id            String                   @id @default(cuid())
+  name          String
+  code          String                   @unique
+  status        DepartmentStatus         @default(ACTIVE)
+  picName       String?
+  description   String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  accounts      BudgetAccount[]
+  annualBudgets DepartmentAnnualBudget[]
+  members       DepartmentMember[]
+  ppdRequests   PPDRequest[]
+
+  @@index([status, name])
+  @@map("departments")
+}
+
+model DepartmentMember {
+  id           String                 @id @default(cuid())
+  departmentId String
+  userId       String?
+  name         String
+  email        String
+  role         DepartmentMemberRole   @default(MEMBER)
+  status       DepartmentMemberStatus @default(ACTIVE)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  department   Department             @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  user         User?                  @relation(fields: [userId], references: [id])
+
+  @@unique([departmentId, email])
+  @@unique([departmentId, userId])
+  @@index([userId])
+  @@map("department_members")
+}
+
+model DepartmentAnnualBudget {
+  id              String     @id @default(cuid())
+  departmentId    String
+  year            Int
+  allocatedAmount Decimal    @default(0) @db.Decimal(18, 2)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  department      Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, year])
+  @@index([year])
+  @@map("department_annual_budgets")
+}
+
+model BudgetAccount {
+  id           String          @id @default(cuid())
+  departmentId String
+  code         String
+  name         String
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  department   Department      @relation(fields: [departmentId], references: [id])
+  budgets      MonthlyBudget[]
+  ppdItems     PPDItem[]
+
+  @@unique([departmentId, code])
+  @@unique([departmentId, name])
+  @@index([departmentId, name])
+  @@map("budget_accounts")
+}
+
+model MonthlyBudget {
+  id             String        @id @default(cuid())
+  accountId      String
+  year           Int
+  month          Int
+  amount         Decimal       @db.Decimal(18, 2)
+  realizedAmount Decimal       @default(0) @db.Decimal(18, 2)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  account        BudgetAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, year, month])
+  @@index([year, month])
+  @@map("monthly_budgets")
+}
+
+model PPDRequest {
+  id                  String             @id @default(cuid())
+  no                  String             @unique
+  title               String
+  description         String?
+  type                PPDType
+  status              PPDStatus          @default(DRAFT)
+  departmentId        String
+  requestedById       String
+  totalAmount         Decimal            @db.Decimal(18, 2)
+  bankName            String?
+  accountNo           String?
+  accountName         String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  limitFund           Decimal            @default(0) @db.Decimal(18, 2)
+  paymentType         String             @default("Transfer")
+  year                Int
+  month               Int
+  revisionReturnStage PPDApprovalStage?
+  approvalEvents      PPDApprovalEvent[]
+  comments            PPDComment[]
+  items               PPDItem[]
+  paymentProof        PPDPaymentProof?
+  department          Department         @relation(fields: [departmentId], references: [id])
+  requestedBy         User               @relation(fields: [requestedById], references: [id])
+
+  @@index([requestedById, updatedAt])
+  @@index([year, month])
+  @@index([status, departmentId, updatedAt])
+  @@map("ppd_requests")
+}
+
+model PPDItem {
+  id            String         @id @default(cuid())
+  requestId     String
+  accountId     String?
+  description   String
+  amount        Decimal        @db.Decimal(18, 2)
+  attachmentUrl String?
+  createdAt     DateTime       @default(now())
+  title         String         @default("")
+  account       BudgetAccount? @relation(fields: [accountId], references: [id])
+  request       PPDRequest     @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("ppd_items")
+}
+
+model PPDApprovalEvent {
+  id         String            @id @default(cuid())
+  requestId  String
+  actorId    String
+  stage      PPDApprovalStage
+  action     PPDApprovalAction
+  fromStatus PPDStatus?
+  toStatus   PPDStatus
+  note       String?
+  createdAt  DateTime          @default(now())
+  snapshot   Json?
+  actor      User              @relation(fields: [actorId], references: [id])
+  request    PPDRequest        @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("ppd_approval_events")
+}
+
+model PPDComment {
+  id        String     @id @default(cuid())
+  requestId String
+  authorId  String
+  body      String
+  createdAt DateTime   @default(now())
+  author    User       @relation(fields: [authorId], references: [id])
+  request   PPDRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@index([authorId, createdAt])
+  @@map("ppd_comments")
+}
+
+model PPDPaymentProof {
+  id               String     @id @default(cuid())
+  requestId        String     @unique
+  uploadedById     String
+  originalFileName String
+  storagePath      String
+  mimeType         String
+  fileSize         Int
+  paidAmount       Decimal    @db.Decimal(18, 2)
+  paidAt           DateTime
+  referenceNumber  String?
+  financeNote      String?
+  createdAt        DateTime   @default(now())
+  request          PPDRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploadedBy       User       @relation(fields: [uploadedById], references: [id])
+
+  @@index([uploadedById, createdAt])
+  @@map("ppd_payment_proofs")
+}
+
 enum Role {
   ADMIN
   EXECUTIVE
@@ -42,153 +245,25 @@ enum PPDStatus {
   APPROVED_FINANCE
   PAID
   REJECTED
+  PENDING_DEPT_HEAD
+  PENDING_FINANCE
+  PENDING_EXECUTIVE
+  RETURNED_FOR_REVISION
+  PENDING_FINANCE_PAYMENT
+  CANCELLED
 }
 
-model User {
-  id        String   @id @default(cuid())
-  name      String?
-  email     String   @unique
-  password  String
-  role      Role     @default(STAFF)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  departmentMemberships DepartmentMember[]
-  ppdRequests           PPDRequest[]
-
-  @@map("users")
+enum PPDApprovalStage {
+  DEPT_HEAD
+  FINANCE
+  EXECUTIVE
+  PAYMENT
 }
 
-model Department {
-  id          String           @id @default(cuid())
-  name        String
-  code        String           @unique
-  status      DepartmentStatus @default(ACTIVE)
-  picName     String?
-  description String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-
-  members       DepartmentMember[]
-  annualBudgets DepartmentAnnualBudget[]
-  accounts      BudgetAccount[]
-  ppdRequests   PPDRequest[]
-
-  @@index([status, name])
-  @@map("departments")
-}
-
-model DepartmentMember {
-  id           String                 @id @default(cuid())
-  departmentId String
-  userId       String?
-  name         String
-  email        String
-  role         DepartmentMemberRole   @default(MEMBER)
-  status       DepartmentMemberStatus @default(ACTIVE)
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-
-  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  user       User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@unique([departmentId, email])
-  @@unique([departmentId, userId])
-  @@index([userId])
-  @@map("department_members")
-}
-
-model DepartmentAnnualBudget {
-  id              String   @id @default(cuid())
-  departmentId    String
-  year            Int
-  allocatedAmount Decimal  @default(0) @db.Decimal(18, 2)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-
-  @@unique([departmentId, year])
-  @@index([year])
-  @@map("department_annual_budgets")
-}
-
-model BudgetAccount {
-  id           String   @id @default(cuid())
-  departmentId String
-  code         String
-  name         String
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  department Department     @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  budgets    MonthlyBudget[]
-  ppdItems   PPDItem[]
-
-  @@unique([departmentId, code])
-  @@unique([departmentId, name])
-  @@index([departmentId, name])
-  @@map("budget_accounts")
-}
-
-model MonthlyBudget {
-  id              String   @id @default(cuid())
-  accountId       String
-  year            Int
-  month           Int
-  amount          Decimal  @db.Decimal(18, 2)
-  realizedAmount  Decimal  @default(0) @db.Decimal(18, 2)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  account BudgetAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  @@unique([accountId, year, month])
-  @@index([year, month])
-  @@map("monthly_budgets")
-}
-
-model PPDRequest {
-  id              String      @id @default(cuid())
-  no              String      @unique
-  title           String
-  description     String?
-  type            PPDType
-  status          PPDStatus   @default(DRAFT)
-  departmentId    String
-  requestedById   String
-  totalAmount     Decimal     @db.Decimal(18, 2)
-  limitFund       Decimal     @default(0) @db.Decimal(18, 2)
-  bankName        String?
-  accountNo       String?
-  accountName     String?
-  paymentType     String      @default("Transfer")
-  year            Int
-  month           Int
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-
-  department      Department  @relation(fields: [departmentId], references: [id])
-  requestedBy     User        @relation(fields: [requestedById], references: [id])
-  items           PPDItem[]
-
-  @@map("ppd_requests")
-  @@index([requestedById, updatedAt])
-  @@index([year, month])
-}
-
-model PPDItem {
-  id              String      @id @default(cuid())
-  requestId       String
-  accountId       String?
-  description     String
-  amount          Decimal     @db.Decimal(18, 2)
-  attachmentUrl   String?
-  createdAt       DateTime    @default(now())
-
-  request         PPDRequest    @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  account         BudgetAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
-
-  @@map("ppd_items")
+enum PPDApprovalAction {
+  SUBMITTED
+  APPROVED
+  REVISION_REQUESTED
+  CANCELLED
+  PAYMENT_VERIFIED
 }

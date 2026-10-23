@@ -25,7 +25,7 @@ export async function getBudgetPageData(): Promise<BudgetPageData> {
       select: { accountId: true, year: true, month: true, amount: true, realizedAmount: true },
     }),
     prisma.pPDRequest.findMany({
-      where: { status: { in: ["SUBMITTED", "APPROVED_DEPT", "APPROVED_FINANCE"] } },
+      where: { status: { in: ["DRAFT", "PENDING_DEPT_HEAD", "PENDING_FINANCE", "PENDING_EXECUTIVE", "RETURNED_FOR_REVISION", "PENDING_FINANCE_PAYMENT"] } },
       include: { items: true },
       orderBy: { createdAt: "desc" },
     }),

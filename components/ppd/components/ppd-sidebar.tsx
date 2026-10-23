@@ -20,12 +20,15 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { ppdStatusLabel } from "@/lib/ppd-labels";
 import type { Draft } from "../ppd.types";
 
 const CATEGORY_OPTIONS = [
   { value: "All", label: "Semua" },
-  { value: "Draft", label: "Draft" },
-  { value: "Submitted", label: "Diajukan" },
+  { value: "DRAFT", label: "Draft" },
+  { value: "RETURNED_FOR_REVISION", label: "Perlu revisi" },
+  { value: "IN_PROGRESS", label: "Dalam proses" },
+  { value: "COMPLETED", label: "Selesai" },
 ];
 
 export type PpdSidebarProps = {
@@ -138,7 +141,7 @@ export function PpdSidebar({
         <div>
           {sortedDrafts.map((draft, index) => {
             const isSelected = draft.id === selectedDraftId;
-            const isSubmitted = draft.status === "Submitted";
+            const isDraft = draft.status === "DRAFT";
             return (
               <Fragment key={draft.id}>
                 {index > 0 && <Separator className="bg-border/60" />}
@@ -172,10 +175,10 @@ export function PpdSidebar({
 
                   <span className="mt-2.5 flex items-center justify-between text-[11px] text-muted-foreground">
                     <Badge
-                      variant={isSubmitted ? "default" : "secondary"}
+                      variant={isDraft ? "secondary" : draft.status === "RETURNED_FOR_REVISION" ? "destructive" : "default"}
                       className="rounded px-1.5 py-0.5 text-[10px] font-medium"
                     >
-                      {isSubmitted ? "Diajukan" : "Draft"}
+                      {ppdStatusLabel(draft.status)}
                     </Badge>
                     <span>{draft.timeAgo}</span>
                   </span>

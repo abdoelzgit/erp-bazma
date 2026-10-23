@@ -11,6 +11,7 @@ export interface RoutePermission {
  */
 export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { path: "/dashboard/users", roles: [Role.ADMIN] },
+  { path: "/dashboard/ppd/approval", roles: [Role.ADMIN, Role.DEPT_HEAD, Role.FINANCE, Role.EXECUTIVE] },
   { path: "/dashboard/department", roles: [Role.ADMIN, Role.DEPT_HEAD, Role.STAFF] },
   { path: "/dashboard/budget" }, // Semua role
   { path: "/dashboard/ppd" },    // Semua role

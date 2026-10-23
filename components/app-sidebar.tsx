@@ -66,7 +66,7 @@ const data: { navMain: NavMain[] } = {
   ],
 }
 
-export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sidebar> & { user?: { role: string } | null }) {
+export function AppSidebar({ user, approvalCount = 0, ...props }: React.ComponentProps<typeof Sidebar> & { user?: { role: string } | null; approvalCount?: number }) {
   return (
     <Sidebar {...props}>
       <SidebarHeader>
@@ -99,6 +99,11 @@ export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sideb
                   >
                     {item.icon}
                     {item.title}
+                    {item.url === "/dashboard/ppd" && approvalCount > 0 && (
+                      <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground" aria-label={`${approvalCount} PPD menunggu`}>
+                        {approvalCount > 99 ? "99+" : approvalCount}
+                      </span>
+                    )}
                   </SidebarMenuButton>
                   {item.items?.length ? (
                     <SidebarMenuSub>

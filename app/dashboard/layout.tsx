@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/session";
 import { AppSidebar } from "@/components/app-sidebar";
 import { prisma } from "@/lib/prisma";
+import { getPpdPendingCount } from "@/lib/ppd-approval-data";
 import {
   SidebarInset,
   SidebarProvider,
@@ -14,12 +15,13 @@ async function DashboardContent({
 }) {
   const session = await getCurrentUser();
   const user = session
-    ? await prisma.user.findUnique({ where: { id: session.id }, select: { role: true } })
+    ? await prisma.user.findUnique({ where: { id: session.id }, select: { id: true, role: true } })
     : null;
+  const approvalCount = user ? await getPpdPendingCount(user.id, user.role) : 0;
 
   return (
     <SidebarProvider>
-      <AppSidebar user={user} />
+      <AppSidebar user={user} approvalCount={approvalCount} />
       <SidebarInset>
         {children}
       </SidebarInset>
