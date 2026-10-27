@@ -1,0 +1,2 @@
+ALTER TABLE "ppd_items"
+ADD COLUMN IF NOT EXISTS "attachmentUrls" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

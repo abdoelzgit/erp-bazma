@@ -6,7 +6,7 @@ export const PPD_ATTACHMENT_TYPES = {
   "image/jpeg": { extension: "jpg", inline: true },
   "image/png": { extension: "png", inline: true },
   "image/webp": { extension: "webp", inline: true },
-  "application/pdf": { extension: "pdf", inline: false },
+  "application/pdf": { extension: "pdf", inline: true },
   "application/msword": { extension: "doc", inline: false },
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
     extension: "docx",

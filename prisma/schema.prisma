@@ -17,8 +17,11 @@ model User {
   updatedAt             DateTime           @updatedAt
   departmentMemberships DepartmentMember[]
   ppdApprovalEvents     PPDApprovalEvent[]
+  ppdAccountabilityReports PPDAccountabilityReport[]
   ppdComments           PPDComment[]
   ppdPaymentProofs      PPDPaymentProof[]
+  ppdSettlementProofUploads PPDSettlementProof[] @relation("PPDSettlementProofUploader")
+  ppdSettlementProofVerifications PPDSettlementProof[] @relation("PPDSettlementProofVerifier")
   ppdRequests           PPDRequest[]
 
   @@map("users")
@@ -86,6 +89,7 @@ model BudgetAccount {
   department   Department      @relation(fields: [departmentId], references: [id])
   budgets      MonthlyBudget[]
   ppdItems     PPDItem[]
+  accountabilityItems PPDAccountabilityItem[]
 
   @@unique([departmentId, code])
   @@unique([departmentId, name])
@@ -130,9 +134,11 @@ model PPDRequest {
   month               Int
   revisionReturnStage PPDApprovalStage?
   approvalEvents      PPDApprovalEvent[]
+  accountabilityReport PPDAccountabilityReport?
   comments            PPDComment[]
   items               PPDItem[]
   paymentProof        PPDPaymentProof?
+  settlementProofs    PPDSettlementProof[]
   department          Department         @relation(fields: [departmentId], references: [id])
   requestedBy         User               @relation(fields: [requestedById], references: [id])
 
@@ -148,13 +154,44 @@ model PPDItem {
   accountId     String?
   description   String
   amount        Decimal        @db.Decimal(18, 2)
-  attachmentUrl String?
+  attachmentUrl  String?
+  attachmentUrls String[]       @default([])
   createdAt     DateTime       @default(now())
   title         String         @default("")
   account       BudgetAccount? @relation(fields: [accountId], references: [id])
   request       PPDRequest     @relation(fields: [requestId], references: [id], onDelete: Cascade)
 
   @@map("ppd_items")
+}
+
+model PPDAccountabilityReport {
+  id            String                  @id @default(cuid())
+  requestId     String                  @unique
+  submittedById String
+  totalAmount   Decimal                 @db.Decimal(18, 2)
+  submittedAt   DateTime                @default(now())
+  request       PPDRequest              @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  submittedBy   User                    @relation(fields: [submittedById], references: [id])
+  items         PPDAccountabilityItem[]
+
+  @@index([submittedById, submittedAt])
+  @@map("ppd_accountability_reports")
+}
+
+model PPDAccountabilityItem {
+  id               String                  @id @default(cuid())
+  reportId         String
+  accountId        String?
+  title            String
+  description      String                  @default("")
+  amount           Decimal                 @db.Decimal(18, 2)
+  attachmentUrl    String?
+  attachmentUrls   String[]                @default([])
+  report           PPDAccountabilityReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  account          BudgetAccount?          @relation(fields: [accountId], references: [id])
+
+  @@index([reportId])
+  @@map("ppd_accountability_items")
 }
 
 model PPDApprovalEvent {
@@ -210,6 +247,31 @@ model PPDPaymentProof {
   @@map("ppd_payment_proofs")
 }
 
+model PPDSettlementProof {
+  id               String               @id @default(cuid())
+  requestId        String
+  type             PPDSettlementProofType
+  uploadedById     String
+  verifiedById     String?
+  originalFileName String
+  storagePath      String
+  mimeType         String
+  fileSize         Int
+  amount           Decimal              @db.Decimal(18, 2)
+  paidAt           DateTime
+  referenceNumber  String?
+  note             String?
+  createdAt        DateTime             @default(now())
+  verifiedAt       DateTime?
+  request          PPDRequest           @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploadedBy       User                 @relation("PPDSettlementProofUploader", fields: [uploadedById], references: [id])
+  verifiedBy       User?                @relation("PPDSettlementProofVerifier", fields: [verifiedById], references: [id])
+
+  @@unique([requestId, type])
+  @@index([uploadedById, createdAt])
+  @@map("ppd_settlement_proofs")
+}
+
 enum Role {
   ADMIN
   EXECUTIVE
@@ -250,6 +312,10 @@ enum PPDStatus {
   PENDING_EXECUTIVE
   RETURNED_FOR_REVISION
   PENDING_FINANCE_PAYMENT
+  PENDING_ACCOUNTABILITY
+  PENDING_FINANCE_SETTLEMENT
+  PENDING_APPLICANT_REFUND
+  PENDING_FINANCE_REFUND_VERIFICATION
   CANCELLED
 }
 
@@ -266,4 +332,12 @@ enum PPDApprovalAction {
   REVISION_REQUESTED
   CANCELLED
   PAYMENT_VERIFIED
+  ACCOUNTABILITY_SUBMITTED
+  REFUND_SUBMITTED
+  REFUND_VERIFIED
+}
+
+enum PPDSettlementProofType {
+  TOP_UP
+  REFUND
 }

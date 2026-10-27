@@ -87,9 +87,14 @@ export function getPpdRevisionChanges(
     const formatRow = (row: PpdRevisionSnapshot["rows"][number] | undefined) => {
       if (!row) return "(dihapus)";
       const label = row.title || row.accountId || `Item ${index + 1}`;
-      return `${label} · ${row.description || "tanpa deskripsi"} · Rp ${row.amount.toLocaleString("id-ID")}`;
+      const attachment = row.attachmentName
+        ? row.attachmentName.split("\n").map((url, attachmentIndex) => getPpdAttachmentName(url, `Lampiran ${attachmentIndex + 1}`)).join(", ")
+        : "tanpa lampiran";
+      return `${label} · ${row.description || "tanpa deskripsi"} · Rp ${row.amount.toLocaleString("id-ID")} · ${attachment}`;
     };
     changes.push({ label: `Rincian item ${index + 1}`, before: formatRow(oldRow), after: formatRow(newRow) });
   }
   return changes;
 }
+import { getPpdAttachmentName } from "@/lib/ppd-attachment-name";
+

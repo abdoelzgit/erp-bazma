@@ -10,6 +10,7 @@ import {
   UploadSimpleIcon,
   CircleNotchIcon,
   TrashIcon,
+  EyeIcon,
 } from "@phosphor-icons/react";
 
 
@@ -41,6 +42,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn, formatRupiah } from "@/lib/utils";
+import { getPpdAttachmentName } from "@/lib/ppd-attachment-name";
 import type { ReportRow } from "../ppd.types";
 
 const PAGE_SIZE = 5;
@@ -55,7 +57,7 @@ export type PpdReportTableProps = {
   draftId: string;
   rows: ReportRow[];
   onAdd: () => void;
-  onUpdate: (id: string, field: keyof ReportRow, value: string | number | null) => void;
+  onUpdate: (id: string, field: keyof ReportRow, value: string | number | string[] | null) => void;
   onRemove: (id: string) => void;
   total: number;
   deptName: string;
@@ -66,16 +68,19 @@ export type PpdReportTableProps = {
   selectedAccountId: string;
   onAccountChange: (accountId: string) => void;
   readOnly?: boolean;
+  revisionOnly?: boolean;
+  title?: string;
+  description?: string;
+  hideAccountSelector?: boolean;
+  comparisonAmount?: number;
 };
 
-function ReportCard({ children }: { children: ReactNode }) {
+function ReportCard({ children, title, description }: { children: ReactNode; title?: string; description?: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Tabel laporan pertanggungjawaban</CardTitle>
-        <CardDescription className="text-xs">
-          Rincian item pengeluaran dan lampiran bukti transaksi.
-        </CardDescription>
+        <CardTitle className="text-sm">{title ?? "Tabel laporan pertanggungjawaban"}</CardTitle>
+        <CardDescription className="text-xs">{description ?? "Rincian item pengeluaran dan lampiran bukti transaksi."}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">{children}</CardContent>
     </Card>
@@ -105,6 +110,11 @@ export function PpdReportTable({
   selectedAccountId,
   onAccountChange,
   readOnly = false,
+  revisionOnly = false,
+  title,
+  description,
+  hideAccountSelector = false,
+  comparisonAmount,
 }: PpdReportTableProps) {
   const [page, setPage] = useState(0);
   const [uploadingRows, setUploadingRows] = useState<string[]>([]);
@@ -112,7 +122,7 @@ export function PpdReportTable({
 
   if (!deptName) {
     return (
-      <ReportCard>
+      <ReportCard title={title} description={description}>
         <EmptyState>Pilih departemen terlebih dahulu untuk menambahkan item pengajuan.</EmptyState>
       </ReportCard>
     );
@@ -127,6 +137,7 @@ export function PpdReportTable({
   const remaining = selectedBudget
     ? selectedBudget.amount - selectedBudget.realized - reserved
     : undefined;
+  const comparisonDifference = comparisonAmount === undefined ? undefined : comparisonAmount - total;
 
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
@@ -161,9 +172,32 @@ export function PpdReportTable({
 
   const renderAttachment = (row: ReportRow, id: string, index: number) => {
     const fileInputId = `${id}-file`;
-    const uploadPath = `/api/ppd/attachments/${draftId}/`;
-    const isUploadedFile = row.attachmentName.startsWith(uploadPath);
+    const attachments = row.attachmentNames?.length ? row.attachmentNames : row.attachmentName ? [row.attachmentName] : [];
     const isUploading = uploadingRows.includes(row.id);
+    const removeAttachment = (attachmentIndex: number) => {
+      const nextAttachments = attachments.filter((_, currentIndex) => currentIndex !== attachmentIndex);
+      onUpdate(row.id, "attachmentName", nextAttachments[0] ?? "");
+      onUpdate(row.id, "attachmentNames", nextAttachments);
+    };
+    const renderAttachmentItem = (url: string, attachmentIndex: number) => {
+      const isPreviewable = /\.(jpe?g|png|webp|pdf)(?:[?#]|$)/i.test(url);
+      const originalName = getPpdAttachmentName(url, `Lampiran ${attachmentIndex + 1}`);
+      return (
+        <li key={`${url}-${attachmentIndex}`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-background px-2 py-1.5">
+          {isPreviewable ? (
+            <a href={url} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center gap-1.5 text-xs text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Buka pratinjau ${originalName} di tab baru untuk item ${index}`} title={originalName}>
+              <EyeIcon className="size-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate">{originalName}</span>
+            </a>
+          ) : (
+            <a href={url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-xs text-primary underline-offset-4 hover:underline" title={originalName}>
+              {originalName}
+            </a>
+          )}
+          {!readOnly && <Button type="button" variant="ghost" size="icon-xs" className="size-6 shrink-0 text-muted-foreground hover:text-destructive" disabled={isUploading} onClick={() => removeAttachment(attachmentIndex)} aria-label={`Hapus lampiran ${attachmentIndex + 1} dari item ${index}`}><TrashIcon className="size-3.5" /></Button>}
+        </li>
+      );
+    };
 
     return (
       <div className="min-w-0 space-y-1">
@@ -171,36 +205,42 @@ export function PpdReportTable({
           <Input
             id={fileInputId}
             type="file"
+            multiple
             accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
             aria-label={`Pilih lampiran untuk item ${index}`}
             className="sr-only"
             disabled={isUploading || readOnly}
             onChange={(event) => {
-              const file = event.currentTarget.files?.[0];
+              const files = Array.from(event.currentTarget.files ?? []);
               event.currentTarget.value = "";
-              if (!file) return;
+              if (!files.length) return;
 
               setAttachmentErrors((previous) => ({ ...previous, [row.id]: "" }));
               setUploadingRows((previous) => [...previous, row.id]);
-              const formData = new FormData();
-              formData.set("draftId", draftId);
-              formData.set("file", file);
-
-              void fetch("/api/ppd/attachments", { method: "POST", body: formData })
-                .then(async (response) => {
-                  const result = await response.json();
-                  if (!response.ok) throw new Error(result.error ?? "Lampiran gagal diunggah.");
-                  onUpdate(row.id, "attachmentName", result.url);
-                })
-                .catch((error: unknown) => {
+              void (async () => {
+                const uploadedUrls: string[] = [];
+                try {
+                  for (const file of files) {
+                    const formData = new FormData();
+                    formData.set("draftId", draftId);
+                    formData.set("file", file);
+                    const response = await fetch("/api/ppd/attachments", { method: "POST", body: formData });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error ?? `Lampiran ${file.name} gagal diunggah.`);
+                    uploadedUrls.push(result.url);
+                    const nextAttachments = [...attachments, ...uploadedUrls];
+                    onUpdate(row.id, "attachmentName", nextAttachments[0] ?? "");
+                    onUpdate(row.id, "attachmentNames", nextAttachments);
+                  }
+                } catch (error: unknown) {
                   setAttachmentErrors((previous) => ({
                     ...previous,
                     [row.id]: error instanceof Error ? error.message : "Lampiran gagal diunggah.",
                   }));
-                })
-                .finally(() => {
+                } finally {
                   setUploadingRows((previous) => previous.filter((rowId) => rowId !== row.id));
-                });
+                }
+              })();
             }}
           />
           <Button
@@ -210,31 +250,36 @@ export function PpdReportTable({
             className="h-8 shrink-0 gap-1.5 px-2 xl:w-8 xl:px-0"
             disabled={isUploading || readOnly}
             onClick={() => document.getElementById(fileInputId)?.click()}
-            aria-label={`Unggah lampiran untuk item ${index}`}
+            aria-label={`Tambah lampiran untuk item ${index}`}
           >
             {isUploading ? (
               <CircleNotchIcon className="size-3.5 animate-spin" />
             ) : (
               <UploadSimpleIcon className="size-3.5" />
             )}
-            <span className="xl:sr-only">{isUploading ? "Mengunggah" : "Unggah"}</span>
+            <span className="xl:sr-only">{isUploading ? "Mengunggah" : "Tambah lampiran"}</span>
           </Button>
-          {isUploadedFile ? (
-            <a
-              href={row.attachmentName}
-              target="_blank"
-              rel="noreferrer"
-              className="min-w-0 truncate text-xs text-primary underline-offset-4 hover:underline"
-              title="Buka lampiran"
-            >
-              Lihat file
-            </a>
-          ) : row.attachmentName ? (
-            <span className="min-w-0 truncate text-xs text-muted-foreground" title={row.attachmentName}>
-              {row.attachmentName}
-            </span>
+          {attachments.length ? (
+            <ul className="flex min-w-0 flex-wrap items-center gap-1.5">
+              {renderAttachmentItem(attachments[0], 0)}
+              {attachments.length > 1 && (
+                <li>
+                  <Popover>
+                    <PopoverTrigger aria-label={`Lihat ${attachments.length - 1} lampiran lainnya untuk item ${index}`} className="inline-flex h-7 items-center rounded-md border bg-background px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      +{attachments.length - 1} lainnya
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="max-h-72 overflow-y-auto p-3">
+                      <h4 className="mb-2 text-xs font-semibold">Lampiran lainnya</h4>
+                      <ul className="space-y-1.5">
+                        {attachments.slice(1).map((url, attachmentIndex) => renderAttachmentItem(url, attachmentIndex + 1))}
+                      </ul>
+                    </PopoverContent>
+                  </Popover>
+                </li>
+              )}
+            </ul>
           ) : (
-            <span className="min-w-0 truncate text-[11px] text-muted-foreground">Dokumen atau gambar</span>
+            <span className="min-w-0 truncate text-[11px] text-muted-foreground">Pilih satu atau beberapa file (maks. 10 MB per file)</span>
           )}
         </div>
         {attachmentErrors[row.id] && (
@@ -258,7 +303,7 @@ export function PpdReportTable({
         placeholder="0"
         value={row.amount || ""}
         onChange={(e) => onUpdate(row.id, "amount", Number(e.target.value))}
-        disabled={readOnly}
+      disabled={readOnly}
         className={amountInputClass}
       />
     </div>
@@ -270,7 +315,7 @@ export function PpdReportTable({
       variant="ghost"
       size="icon"
       onClick={() => onRemove(row.id)}
-      disabled={readOnly}
+        disabled={readOnly}
       className="size-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
       aria-label={`Hapus item ${index}`}
     >
@@ -279,17 +324,26 @@ export function PpdReportTable({
   );
 
   return (
-    <ReportCard>
+    <ReportCard title={title} description={description}>
+      {revisionOnly ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">Anda dapat menambah dan menghapus baris, serta mengubah judul, nominal, dan lampiran. Account dan deskripsi tetap.</p>
+          <Button type="button" size="sm" onClick={() => { setPage(Math.floor(rows.length / PAGE_SIZE)); onAdd(); }} disabled={readOnly || rows.length >= 200} className="h-9 gap-1.5 text-xs">
+            <PlusIcon className="size-3.5" />
+            Tambah baris
+          </Button>
+        </div>
+      ) : <>
       {/* Toolbar */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
-          <div className="w-full min-w-48 space-y-1.5 sm:w-60 sm:flex-none">
+          {!hideAccountSelector && <div className="w-full min-w-48 space-y-1.5 sm:w-60 sm:flex-none">
             <Label htmlFor="ppd-report-account" className="text-xs text-muted-foreground">
               Jenis pengajuan
             </Label>
             <Select
               value={selectedAccountId}
-              disabled={readOnly}
+              disabled={readOnly || revisionOnly}
               onValueChange={(value) => {
                 if (!value) return;
                 setPage(0);
@@ -308,34 +362,49 @@ export function PpdReportTable({
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </div>}
 
-          {selectedAccountId && (
+          {(comparisonAmount !== undefined || selectedAccountId) && (
             <Popover>
               <PopoverTrigger
                 openOnHover
                 delay={150}
                 closeDelay={120}
-                aria-label="Lihat detail anggaran"
+                aria-label={comparisonAmount !== undefined ? "Lihat perbandingan uang muka dan realisasi" : "Lihat detail anggaran"}
                 className="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-xs shadow-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="text-muted-foreground">Sisa anggaran</span>
+                <span className="text-muted-foreground">{comparisonAmount !== undefined ? "Selisih pengajuan" : "Sisa anggaran"}</span>
                 <span
                   className={cn(
                     "font-mono font-medium",
-                    remaining !== undefined && remaining < 0 && "text-destructive",
+                    comparisonDifference !== undefined
+                      ? comparisonDifference < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"
+                      : remaining !== undefined && remaining < 0 && "text-destructive",
                   )}
                 >
-                  {remaining !== undefined ? formatRupiah(remaining) : "Belum diatur"}
+                  {comparisonDifference !== undefined
+                    ? `${comparisonDifference > 0 ? "+" : comparisonDifference < 0 ? "-" : ""}${formatRupiah(Math.abs(comparisonDifference))}`
+                    : remaining !== undefined ? formatRupiah(remaining) : "Belum diatur"}
                 </span>
                 <InfoIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
               </PopoverTrigger>
               <PopoverContent align="start" sideOffset={8} className="w-72 space-y-3 p-4">
+                {comparisonAmount !== undefined ? (
+                  <>
+                    <div>
+                      <p className="text-sm font-semibold">Perbandingan uang muka</p>
+                      <p className="text-xs text-muted-foreground">Pengajuan awal dibandingkan dengan total laporan realisasi.</p>
+                    </div>
+                    <dl className="space-y-2 border-t pt-3 text-xs">
+                      <div className="flex items-center justify-between gap-4"><dt className="text-muted-foreground">Jumlah pengajuan awal</dt><dd className="font-mono">{formatRupiah(comparisonAmount)}</dd></div>
+                      <div className="flex items-center justify-between gap-4"><dt className="text-muted-foreground">Realisasi</dt><dd className="font-mono">{formatRupiah(total)}</dd></div>
+                      <div className="flex items-center justify-between gap-4 border-t pt-2"><dt className="font-medium">{comparisonDifference! > 0 ? "Surplus" : comparisonDifference! < 0 ? "Kekurangan" : "Selisih"}</dt><dd className={cn("font-mono font-semibold", comparisonDifference! < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400")}>{comparisonDifference! > 0 ? "+" : comparisonDifference! < 0 ? "-" : ""}{formatRupiah(Math.abs(comparisonDifference!))}</dd></div>
+                    </dl>
+                  </>
+                ) : <>
                 <div>
                   <p className="text-sm font-semibold">{selectedAccount?.name ?? "Detail anggaran"}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Periode {month}/{year}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Periode {month}/{year}</p>
                 </div>
                 {selectedBudget ? (
                   <dl className="space-y-2 border-t pt-3 text-xs">
@@ -368,6 +437,7 @@ export function PpdReportTable({
                     Anggaran belum diatur untuk periode ini.
                   </p>
                 )}
+                </>}
               </PopoverContent>
             </Popover>
           )}
@@ -387,8 +457,9 @@ export function PpdReportTable({
           Tambah baris
         </Button>
       </div>
+      </>}
 
-      {accounts.length === 0 ? (
+      {accounts.length === 0 && !revisionOnly && !hideAccountSelector ? (
         <EmptyState>Tidak ada jenis pengajuan untuk departemen ini.</EmptyState>
       ) : (
         <>
@@ -415,12 +486,12 @@ export function PpdReportTable({
                     {renderTitle(row, `${row.id}-title`, index)}
                   </div>
 
-                  <div className="space-y-1.5">
+                  {!revisionOnly && <div className="space-y-1.5">
                     <Label htmlFor={`${row.id}-desc`} className="text-xs text-muted-foreground">
                       Deskripsi
                     </Label>
                     {renderDescription(row, `${row.id}-desc`, index)}
-                  </div>
+                  </div>}
 
                   <div className="space-y-1.5">
                     <Label htmlFor={`${row.id}-att`} className="text-xs text-muted-foreground">
@@ -454,7 +525,7 @@ export function PpdReportTable({
               <TableHeader className="bg-muted/40">
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Judul</TableHead>
-                  <TableHead>Deskripsi</TableHead>
+                  {!revisionOnly && <TableHead>Deskripsi</TableHead>}
                   <TableHead>Lampiran</TableHead>
                   <TableHead className="w-48 text-right">Jumlah</TableHead>
                   <TableHead className="w-12 text-center">
@@ -471,9 +542,9 @@ export function PpdReportTable({
                       <TableCell className="py-2.5">
                         {renderTitle(row, `${row.id}-title-d`, index)}
                       </TableCell>
-                      <TableCell className="py-2.5">
+                      {!revisionOnly && <TableCell className="py-2.5">
                         {renderDescription(row, `${row.id}-desc-d`, index)}
-                      </TableCell>
+                      </TableCell>}
                       <TableCell className="overflow-hidden py-2.5">
                         {renderAttachment(row, `${row.id}-att-d`, index)}
                       </TableCell>
@@ -488,7 +559,7 @@ export function PpdReportTable({
                 {rows.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
                     <TableCell
-                      colSpan={5}
+                      colSpan={revisionOnly ? 4 : 5}
                       style={{ height: PAGE_SIZE * ROW_HEIGHT_PX }}
                       className="p-0 text-center text-sm text-muted-foreground"
                     >
@@ -502,14 +573,14 @@ export function PpdReportTable({
                       aria-hidden="true"
                       className={cn("hover:bg-transparent", ROW_HEIGHT_CLASS)}
                     >
-                      <TableCell colSpan={5} className="p-0" />
+                      <TableCell colSpan={revisionOnly ? 4 : 5} className="p-0" />
                     </TableRow>
                   ))
                 )}
               </TableBody>
               <TableFooter>
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={3} className="py-3 text-right font-semibold">
+                  <TableCell colSpan={revisionOnly ? 2 : 3} className="py-3 text-right font-semibold">
                     Total
                   </TableCell>
                   <TableCell className="py-3 text-right font-mono font-semibold text-primary">

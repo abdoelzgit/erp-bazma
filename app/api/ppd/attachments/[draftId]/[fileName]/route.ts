@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { basename, extname, join } from "node:path";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canReadPpdRequest } from "@/lib/ppd-read-access";
@@ -11,7 +11,7 @@ const mimeByExtension = Object.fromEntries(
 ) as Record<string, string>;
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ draftId: string; fileName: string }> },
 ) {
   const session = await getCurrentUser();
@@ -35,10 +35,15 @@ export async function GET(
   try {
     const bytes = await readFile(join(PPD_ATTACHMENT_DIRECTORY, draft.id, fileName));
     const inline = PPD_ATTACHMENT_TYPES[contentType as keyof typeof PPD_ATTACHMENT_TYPES].inline;
+    const requestedName = new URL(request.url).searchParams.get("name");
+    const originalName = basename((requestedName || `attachment${extension}`).replace(/\\/g, "/"))
+      .replace(/[\u0000-\u001f\u007f"\\]/g, "_").slice(0, 255) || `attachment${extension}`;
+    const asciiName = originalName.replace(/[^\x20-\x7e]/g, "_");
+    const encodedName = encodeURIComponent(originalName).replace(/[!'()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
     return new Response(bytes, {
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="attachment${extension}"`,
+        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
       },

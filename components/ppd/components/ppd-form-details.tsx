@@ -236,10 +236,11 @@ export function PpdFormDetails({
             id="p-limit"
             inputMode="numeric"
             value={limitFund}
-            disabled={disabled}
+            disabled={disabled || submissionType === "UANG_MUKA"}
             onChange={(e) => onLimitFundChange(e.target.value)}
             className="h-10 text-sm font-medium"
           />
+          
         </Field>
       </Section>
     </div>

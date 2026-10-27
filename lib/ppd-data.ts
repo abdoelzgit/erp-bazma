@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { getPpdDepartmentAccessWhere } from "@/lib/ppd-access";
-import { PPDType } from "@prisma/client";
+import { PPDApprovalStage, PPDType } from "@prisma/client";
 import type { PpdPageData } from "@/components/ppd/ppd.types";
 import type { PpdRevisionSnapshot } from "@/lib/ppd-revision";
 
@@ -27,6 +27,13 @@ export async function getPpdPageData(): Promise<PpdPageData> {
             items: { include: { account: { select: { id: true, name: true } } } },
             approvalEvents: { include: { actor: { select: { name: true, email: true } } }, orderBy: { createdAt: "asc" } },
             paymentProof: true,
+            accountabilityReport: {
+              include: {
+                submittedBy: { select: { name: true, email: true } },
+                items: { include: { account: { select: { name: true } } } },
+              },
+            },
+            settlementProofs: { orderBy: { createdAt: "asc" } },
           },
           orderBy: { updatedAt: "desc" },
         })
@@ -48,7 +55,7 @@ export async function getPpdPageData(): Promise<PpdPageData> {
       ? prisma.pPDRequest.findMany({
           where: {
             departmentId: { in: departmentIds },
-            status: { in: ["DRAFT", "PENDING_DEPT_HEAD", "PENDING_FINANCE", "PENDING_EXECUTIVE", "RETURNED_FOR_REVISION", "PENDING_FINANCE_PAYMENT"] },
+            status: { in: ["DRAFT", "PENDING_DEPT_HEAD", "PENDING_FINANCE", "PENDING_EXECUTIVE", "RETURNED_FOR_REVISION", "PENDING_FINANCE_PAYMENT", "PENDING_ACCOUNTABILITY", "PENDING_FINANCE_SETTLEMENT", "PENDING_APPLICANT_REFUND", "PENDING_FINANCE_REFUND_VERIFICATION"] },
             type: PPDType.UANG_MUKA,
           },
           select: {
@@ -84,7 +91,13 @@ export async function getPpdPageData(): Promise<PpdPageData> {
       accountNo: request.accountNo ?? "",
       limitFund: String(Number(request.limitFund)),
       status: request.status,
-      revisionReturnStage: request.revisionReturnStage === "FINANCE" ? "FINANCE" : request.revisionReturnStage === "DEPT_HEAD" ? "DEPT_HEAD" : null,
+      revisionReturnStage: request.revisionReturnStage === PPDApprovalStage.DEPT_HEAD || request.revisionReturnStage === PPDApprovalStage.FINANCE || request.revisionReturnStage === PPDApprovalStage.EXECUTIVE
+        ? request.revisionReturnStage
+        : null,
+      revisionRequestedByStage: (() => {
+        const stage = request.approvalEvents.filter((event) => event.action === "REVISION_REQUESTED").at(-1)?.stage;
+        return stage === PPDApprovalStage.DEPT_HEAD || stage === PPDApprovalStage.FINANCE || stage === PPDApprovalStage.EXECUTIVE ? stage : null;
+      })(),
       revisionSnapshot: (request.approvalEvents.filter((event) => event.action === "REVISION_REQUESTED").at(-1)?.snapshot as PpdRevisionSnapshot | null | undefined) ?? null,
       approvalEvents: request.approvalEvents.map((event) => ({
         id: event.id,
@@ -97,6 +110,7 @@ export async function getPpdPageData(): Promise<PpdPageData> {
         createdAt: event.createdAt.toISOString(),
       })),
       paymentProof: request.paymentProof ? {
+        id: request.paymentProof.id,
         originalFileName: request.paymentProof.originalFileName,
         paidAmount: Number(request.paymentProof.paidAmount),
         paidAt: request.paymentProof.paidAt.toISOString(),
@@ -104,6 +118,32 @@ export async function getPpdPageData(): Promise<PpdPageData> {
         financeNote: request.paymentProof.financeNote,
         fileUrl: `/api/ppd/payment-proofs/${encodeURIComponent(request.id)}`,
       } : null,
+      accountabilityReport: request.accountabilityReport ? {
+        submittedAt: request.accountabilityReport.submittedAt.toISOString(),
+        submittedByName: request.accountabilityReport.submittedBy.name || request.accountabilityReport.submittedBy.email,
+        totalAmount: Number(request.accountabilityReport.totalAmount),
+        rows: request.accountabilityReport.items.map((item) => ({
+          id: item.id,
+          accountId: item.accountId,
+          accountName: item.account?.name ?? null,
+          title: item.title,
+          description: item.description,
+          attachmentName: item.attachmentUrl ?? "",
+          attachmentNames: [item.attachmentUrl, ...item.attachmentUrls].filter((url): url is string => Boolean(url)),
+          amount: Number(item.amount),
+        })),
+      } : null,
+      settlementProofs: request.settlementProofs.map((proof) => ({
+        id: proof.id,
+        type: proof.type,
+        originalFileName: proof.originalFileName,
+        amount: Number(proof.amount),
+        paidAt: proof.paidAt.toISOString(),
+        referenceNumber: proof.referenceNumber,
+        note: proof.note,
+        verifiedAt: proof.verifiedAt?.toISOString() ?? null,
+        fileUrl: `/api/ppd/payment-proofs/${encodeURIComponent(request.id)}?settlementProofId=${encodeURIComponent(proof.id)}`,
+      })),
       year: request.year,
       month: request.month,
       updatedAt: request.updatedAt.toISOString(),
@@ -114,6 +154,7 @@ export async function getPpdPageData(): Promise<PpdPageData> {
         title: item.title,
         description: item.description,
         attachmentName: item.attachmentUrl ?? "",
+        attachmentNames: [item.attachmentUrl, ...item.attachmentUrls].filter((url): url is string => Boolean(url)),
         amount: Number(item.amount),
       })),
     })),

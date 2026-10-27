@@ -2,8 +2,10 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { NextResponse } from "next/server";
+import { PPDStatus, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canUserCreatePpdInDepartment } from "@/lib/ppd-access";
+import { canEditPpdRevision } from "@/lib/ppd-revision-access";
 import { getCurrentUser } from "@/lib/session";
 import {
   isValidPpdAttachmentContent,
@@ -17,7 +19,7 @@ export async function POST(request: Request) {
   const session = await getCurrentUser();
   if (!session) return NextResponse.json({ error: "Silakan masuk untuk mengunggah lampiran." }, { status: 401 });
 
-  const user = await prisma.user.findUnique({ where: { id: session.id }, select: { id: true } });
+  const user = await prisma.user.findUnique({ where: { id: session.id }, select: { id: true, role: true } });
   if (!user) return NextResponse.json({ error: "Sesi pengguna tidak valid." }, { status: 401 });
 
   const contentLength = Number(request.headers.get("content-length"));
@@ -41,11 +43,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ukuran file maksimal 10 MB." }, { status: 413 });
   }
 
-  const draft = await prisma.pPDRequest.findFirst({
-    where: { id: draftId, requestedById: user.id, status: { in: ["DRAFT", "RETURNED_FOR_REVISION"] } },
-    select: { id: true, departmentId: true },
+  const draft = await prisma.pPDRequest.findUnique({
+    where: { id: draftId },
+    select: { id: true, departmentId: true, status: true, requestedById: true },
   });
-  if (!draft || !(await canUserCreatePpdInDepartment(user.id, draft.departmentId))) {
+  const canEditDraft = draft?.status === "DRAFT" && draft.requestedById === user.id &&
+    await canUserCreatePpdInDepartment(user.id, draft.departmentId);
+  const canEditRevision = draft?.status === "RETURNED_FOR_REVISION" && await canEditPpdRevision(user.id, draft.id);
+  const canEditAccountability = draft?.status === PPDStatus.PENDING_ACCOUNTABILITY && draft.requestedById === user.id && user.role === Role.STAFF;
+  if (!draft || (!canEditDraft && !canEditRevision && !canEditAccountability)) {
     return NextResponse.json({ error: "Draft tidak ditemukan atau Anda tidak memiliki akses." }, { status: 404 });
   }
 
@@ -71,7 +77,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    url: `/api/ppd/attachments/${encodeURIComponent(draft.id)}/${fileName}`,
-    name: file.name,
+    url: `/api/ppd/attachments/${encodeURIComponent(draft.id)}/${fileName}?name=${encodeURIComponent(file.name.slice(0, 255))}`,
+    name: file.name.slice(0, 255),
   });
 }
